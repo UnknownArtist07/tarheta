@@ -1,0 +1,46 @@
+# Tarheta
+
+Tarheta is a React digital calling-card app with a refreshed editorial interface. People can create an account, share a public page, save a contact, and organize links and other profile cards. It uses React with Vite, Vercel serverless functions, and Neon Postgres.
+
+## Run locally
+
+1. Install a supported Node.js LTS version (20 or 22 recommended).
+2. In this folder, run `npm install`.
+3. Link the project with `npx vercel link` and pull its environment variables with `npx vercel env pull .env.local`.
+4. Run `npm run dev` and open the local URL Vercel prints.
+5. Use `npm run build` to create a production build in `dist/`.
+
+`index.html` is the React/Vite entry point. The old `Tarheta.html` address redirects to it while preserving profile query/hash parameters; use the local Vercel runtime rather than opening either HTML file directly.
+The original root-level `script.js` and `style.css` are retained as inactive prototype assets; the running React UI is in `src/`.
+
+## Neon and Vercel setup
+
+1. Create a Neon Postgres database using the Neon integration from the Vercel project dashboard.
+2. Make sure `DATABASE_URL` is available in the Vercel Development, Preview, and Production environments.
+3. Link the project locally and pull the `DATABASE_URL` variable with `npx vercel link` and `npx vercel env pull .env.local`.
+4. Deploy with `npx vercel --prod`.
+
+The API creates its tables on the first request. Accounts, salted password hashes, profile content, session records, and profile-view counts are stored in Neon. Passwords are hashed server-side, and login uses an HTTP-only session cookie. The database connection string must only be configured as a server-side environment variable; never add it to a `VITE_` variable or frontend code.
+
+Run `npm run dev` to use Vercel's local function runtime alongside the Vite frontend. It requires the project to be linked and `DATABASE_URL` to be present in `.env.local`.
+
+## Profile routes and demo
+
+Open `/` for the landing page or `/?u=demo` for the illustrative demo public profile. Hash routes such as `/#/demo` are also recognized. Other public profiles load from the API; unknown usernames show a profile-not-found screen. The app updates the browser URL when navigating between screens.
+
+## Try contact actions
+
+Open `/?u=demo` on a phone (or deploy the app to a reachable HTTPS URL). **Call** uses a `tel:` link, which asks the phone to open its dialer; the phone owner confirms the call. **Save contact** downloads a vCard `.vcf` file that can be opened/imported by the phone's Contacts app. Message and Email open the corresponding device apps when supported. Desktop Call/Message affordances also provide the number for copying.
+
+## Prototype limitations
+
+- Profile visits increment a simple database counter; it is not unique-visitor analytics.
+- Social metadata is updated client-side; most messaging crawlers need server-rendered or pre-rendered profile metadata to create per-profile previews.
+- The current card system stores URL values in the browser. It does not provide secure file uploads or media hosting.
+- Existing accounts and profiles saved in an earlier browser `localStorage` version are not automatically imported into Neon.
+
+## Recommended next steps
+
+1. Add safe media storage and upload processing for photos, video, and payment QR images.
+2. Add server-rendered profile metadata for social previews and clean profile routes.
+3. Add automated API tests, monitoring, database backups, and security review.

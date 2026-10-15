@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tarheta</title>
+  </head>
+  <body>
+    <p>Opening Tarheta… <a href="index.html">Continue</a></p>
+    <script>
+      window.location.replace(new URL(`index.html${window.location.search}${window.location.hash}`, window.location.href));
+    </script>
+  </body>
+</html>
