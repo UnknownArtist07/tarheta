@@ -1,8 +1,6 @@
 import { getDb } from '../../lib/server/db.js';
-import {
-  createSession, handleError, newPasswordCredentials, newUserId, profileFromRow,
-  readJson, requireSameOrigin, send, validateProfile,
-} from '../../lib/server/utils.js';
+import { issueEmailChallenge, normalizeEmail } from '../../lib/server/email-challenges.js';
+import { handleError, newPasswordCredentials, readJson, requireSameOrigin, send, validateProfile } from '../../lib/server/utils.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -17,24 +15,24 @@ export default async function handler(req, res) {
       return send(res, 400, { error: 'Choose a password between 8 and 200 characters.' });
     }
     const profile = validateProfile(body.profile);
-    const credentials = newPasswordCredentials(password);
-    const id = newUserId();
+    const email = normalizeEmail(profile.email);
+    profile.email = email;
     const { sql, ready } = getDb();
     await ready;
-    let rows;
-    try {
-      rows = await sql.query(
-        `INSERT INTO tarheta_profiles (id, username, password_salt, password_hash, profile)
-         VALUES ($1, $2, $3, $4, $5::jsonb)
-         RETURNING username, profile, views`,
-        [id, profile.username, credentials.salt, credentials.hash, JSON.stringify(profile)],
-      );
-    } catch (error) {
-      if (error.code === '23505') return send(res, 409, { error: 'That username is already taken.' });
-      throw error;
+    const existing = await sql.query(
+      'SELECT username FROM tarheta_profiles WHERE username = $1 OR LOWER(email) = $2 LIMIT 1',
+      [profile.username, email],
+    );
+    if (existing.length) {
+      return send(res, 409, { error: existing[0].username === profile.username ? 'That username is already taken.' : 'An account already uses that email address.' });
     }
-    await createSession(res, id);
-    return send(res, 201, { profile: profileFromRow(rows[0]) });
+    const credentials = newPasswordCredentials(password);
+    await issueEmailChallenge({
+      email,
+      purpose: 'registration',
+      payload: { profile, credentials },
+    });
+    return send(res, 200, { message: 'A verification code has been sent. It expires in 5 minutes.' });
   } catch (error) {
     return handleError(res, error);
   }

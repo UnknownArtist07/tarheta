@@ -21,6 +21,8 @@ const DEFAULT_APPEARANCE = {
   ...THEME_PRESETS.midnight,
   cardFrontColor: '#f8f4e9',
   cardFrontTextColor: '#252720',
+  cardFrontNameColor: '#252720',
+  cardFrontTransparent: false,
   cardFrontLabel: 'TARHETA · PERSONAL ID',
   cardFrontFooter: 'TARHETA.PH',
   cardBackColor: '#313631',
@@ -39,9 +41,10 @@ function getAppearance(profile) {
     ...saved,
     preset,
   };
-  for (const key of ['backgroundColor', 'surfaceColor', 'textColor', 'accentColor', 'cardFrontColor', 'cardFrontTextColor', 'cardBackColor', 'cardBackTextColor']) {
+  for (const key of ['backgroundColor', 'surfaceColor', 'textColor', 'accentColor', 'cardFrontColor', 'cardFrontTextColor', 'cardFrontNameColor', 'cardBackColor', 'cardBackTextColor']) {
     if (!/^#[\da-f]{6}$/i.test(appearance[key])) appearance[key] = DEFAULT_APPEARANCE[key] || THEME_PRESETS[preset][key];
   }
+  appearance.cardFrontTransparent = Boolean(appearance.cardFrontTransparent);
   appearance.cardBackgroundImage = isSafeWebUrl(appearance.cardBackgroundImage) ? appearance.cardBackgroundImage : '';
   return appearance;
 }
@@ -70,7 +73,8 @@ function AppearancePanel({ profile, onSave }) {
     }));
   };
   const updateField = (event) => {
-    const { name, value } = event.target;
+    const { name } = event.target;
+    const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
     setAppearance((current) => ({ ...current, [name]: value, preset: name.startsWith('card') ? current.preset : 'custom' }));
   };
   const submit = (event) => {
@@ -98,11 +102,13 @@ function AppearancePanel({ profile, onSave }) {
         <div><h3>Personal ID / calling card</h3><p>Customize both sides of your card. Your name and role come from your Profile section.</p></div>
         <label className="form-field"><span>Front label</span><input name="cardFrontLabel" maxLength="50" value={appearance.cardFrontLabel} onChange={updateField} /></label>
         <div className="appearance-color-row">
-          <label className="form-field"><span>Front color</span><input name="cardFrontColor" type="color" value={appearance.cardFrontColor} onChange={updateField} /></label>
+          <label className="form-field"><span>Front color</span><input name="cardFrontColor" type="color" value={appearance.cardFrontColor} onChange={updateField} disabled={appearance.cardFrontTransparent} /></label>
           <label className="form-field"><span>Front text</span><input name="cardFrontTextColor" type="color" value={appearance.cardFrontTextColor} onChange={updateField} /></label>
+          <label className="form-field"><span>Name text</span><input name="cardFrontNameColor" type="color" value={appearance.cardFrontNameColor} onChange={updateField} /></label>
           <label className="form-field"><span>Back color</span><input name="cardBackColor" type="color" value={appearance.cardBackColor} onChange={updateField} /></label>
           <label className="form-field"><span>Back text</span><input name="cardBackTextColor" type="color" value={appearance.cardBackTextColor} onChange={updateField} /></label>
         </div>
+        <label className="visibility-choice"><input name="cardFrontTransparent" type="checkbox" checked={appearance.cardFrontTransparent} onChange={updateField} /><span><strong>Transparent front</strong><small>Show the page behind the front of your calling card.</small></span></label>
         <label className="form-field"><span>Front footer label</span><input name="cardFrontFooter" maxLength="30" value={appearance.cardFrontFooter} onChange={updateField} /></label>
         <label className="form-field"><span>Back label</span><input name="cardBackLabel" maxLength="50" value={appearance.cardBackLabel} onChange={updateField} /></label>
         <label className="form-field"><span>Back footer label</span><input name="cardBackFooter" maxLength="50" value={appearance.cardBackFooter} onChange={updateField} /></label>
@@ -283,7 +289,9 @@ function ProfileCard({ profile, flip, flipped = false, compact = false }) {
   const hasBackground = isSafeWebUrl(appearance.cardBackgroundImage);
   const cardStyle = {
     '--calling-front-color': appearance.cardFrontColor,
+    '--calling-front-background': appearance.cardFrontTransparent ? 'transparent' : appearance.cardFrontColor,
     '--calling-front-text-color': appearance.cardFrontTextColor,
+    '--calling-front-name-color': appearance.cardFrontNameColor,
     '--calling-back-color': appearance.cardBackColor,
     '--calling-back-text-color': appearance.cardBackTextColor,
   };
@@ -295,7 +303,7 @@ function ProfileCard({ profile, flip, flipped = false, compact = false }) {
   ].filter(([, value]) => value);
   return (
     <div
-      className={`identity-card ${compact ? 'identity-card-compact' : ''} ${flipped ? 'is-flipped' : ''}`}
+      className={`identity-card ${appearance.cardFrontTransparent ? 'card-front-transparent' : ''} ${compact ? 'identity-card-compact' : ''} ${flipped ? 'is-flipped' : ''}`}
       style={cardStyle}
       role="button"
       tabIndex={0}
@@ -432,7 +440,7 @@ function ProfileSettings({ profile, onProfileSave, onSocialSave, onPhotoChange, 
         <label className="form-field"><span>Username</span><input name="username" required minLength="3" maxLength="30" pattern="[a-z0-9._]+" defaultValue={profile.username} /></label>
         <div className="form-row"><label className="form-field"><span>Role or title</span><input name="title" maxLength="100" defaultValue={profile.title} /></label><label className="form-field"><span>Organization</span><input name="organization" maxLength="100" defaultValue={profile.organization} /></label></div>
         <label className="form-field"><span>Phone</span><input name="phone" type="tel" defaultValue={profile.phone} /></label>
-        <label className="form-field"><span>Email</span><input name="email" type="email" required defaultValue={profile.email} /></label>
+        <label className="form-field"><span>Public contact email</span><input name="email" type="email" required defaultValue={profile.email} /><small className="profile-email-note">Your sign-in recovery email is the address verified when you created your account.</small></label>
         <label className="form-field"><span>Bio</span><textarea name="bio" maxLength="300" rows="3" defaultValue={profile.bio} /></label>
         <label className="form-field"><span>Website</span><input name="website" defaultValue={profile.website} /></label>
         <Button variant="coral" type="submit" className="form-submit">Save personal details <Check size={16} /></Button>
@@ -499,6 +507,9 @@ function App() {
   const [profile, setProfile] = useState(null);
   const [toast, setToast] = useState('');
   const [username, setUsername] = useState('');
+  const [authStep, setAuthStep] = useState('details');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authMessage, setAuthMessage] = useState('');
   const [cardDialog, setCardDialog] = useState(false);
   const [contactDialog, setContactDialog] = useState('');
   const [cardEditing, setCardEditing] = useState(null);
@@ -687,6 +698,9 @@ function App() {
   };
   const profileInitial = () => {
     setProfile(EMPTY_PROFILE);
+    setAuthStep('details');
+    setAuthEmail('');
+    setAuthMessage('');
     setPage('register');
   };
   const changeProfilePhoto = async (event) => {
@@ -798,17 +812,15 @@ function App() {
       showToast('Your profile looks lovely. Changes saved.');
     } else {
       try {
-        const { profile: createdProfile } = await apiRequest('/api/auth/register', {
+        await apiRequest('/api/auth/register', {
           method: 'POST',
           body: { profile: next, password: String(data.password || '') },
         });
-        setProfile(createdProfile);
-        changeAddress();
-        setPage('owner');
-        setSection('card');
-        showToast('Your Tarheta is ready.');
+        setAuthEmail(email.toLowerCase());
+        setAuthStep('verify-registration');
+        setAuthMessage('');
       } catch (error) {
-        showToast(error.message || 'Could not create your account. Please try again.');
+        showToast(error.message || 'Could not send your verification code. Please try again.');
       }
     }
   }
@@ -884,6 +896,11 @@ function App() {
     : 'Use 3–30 lowercase letters, numbers, dots, and underscores.';
 
   const routeTo = (next) => {
+    if (next === 'login' || next === 'register') {
+      setAuthStep('details');
+      setAuthEmail('');
+      setAuthMessage('');
+    }
     setPage(next);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -981,6 +998,9 @@ function App() {
 
   if (page === 'register' || page === 'login') {
     const registering = page === 'register';
+    const verifyingRegistration = registering && authStep === 'verify-registration';
+    const requestingReset = !registering && authStep === 'forgot-email';
+    const resettingPassword = !registering && authStep === 'forgot-reset';
     const onLogin = async (event) => {
       event.preventDefault();
       const formData = new FormData(event.currentTarget);
@@ -999,27 +1019,130 @@ function App() {
         showToast(error.message || 'Could not sign in. Please try again.');
       }
     };
+    const onVerifyRegistration = async (event) => {
+      event.preventDefault();
+      const code = String(new FormData(event.currentTarget).get('code') || '').trim();
+      try {
+        const result = await apiRequest('/api/auth/register/verify', {
+          method: 'POST',
+          body: { email: authEmail, code },
+        });
+        setUsername(result.profile.username);
+        setAuthStep('details');
+        setAuthMessage(result.message || 'Your email is verified. Log in to continue.');
+        setPage('login');
+      } catch (error) {
+        showToast(error.message || 'Could not verify that code. Please try again.');
+      }
+    };
+    const onRequestReset = async (event) => {
+      event.preventDefault();
+      const email = String(new FormData(event.currentTarget).get('email') || '').trim().toLowerCase();
+      try {
+        const result = await apiRequest('/api/auth/password/reset-request', {
+          method: 'POST',
+          body: { email },
+        });
+        setAuthEmail(email);
+        setAuthStep('forgot-reset');
+        setAuthMessage(result.message);
+      } catch (error) {
+        showToast(error.message || 'Could not request a reset code. Please try again.');
+      }
+    };
+    const onResetPassword = async (event) => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(event.currentTarget).entries());
+      try {
+        const result = await apiRequest('/api/auth/password/reset', {
+          method: 'POST',
+          body: { email: authEmail, code: data.code, newPassword: data.newPassword },
+        });
+        setAuthStep('details');
+        setAuthMessage(result.message || 'Password changed. Log in with your new password.');
+      } catch (error) {
+        showToast(error.message || 'Could not reset your password. Please try again.');
+      }
+    };
+    const onResendCode = async (purpose) => {
+      try {
+        const result = await apiRequest('/api/auth/code/resend', {
+          method: 'POST',
+          body: { email: authEmail, purpose },
+        });
+        setAuthMessage(result.message);
+      } catch (error) {
+        showToast(error.message || 'Could not send another code yet.');
+      }
+    };
+    const authEmailNote = (title, copy) => (
+      <div className="auth-email-note"><Mail size={18} /><span><strong>{title}</strong><small>{copy}</small></span></div>
+    );
+    const switchAuthPage = () => {
+      setAuthStep('details');
+      setAuthEmail('');
+      setAuthMessage('');
+      routeTo(registering ? 'login' : 'register');
+    };
+    const authTitle = verifyingRegistration ? 'Check your inbox'
+      : requestingReset ? 'Reset your password'
+        : resettingPassword ? 'Choose a new password'
+          : registering ? 'Create your Tarheta' : 'Log in to your page';
+    const authIntro = verifyingRegistration
+      ? `Enter the 6-digit verification code sent to ${authEmail}. It expires in 5 minutes.`
+      : requestingReset
+        ? 'Enter the email address you used for your Tarheta account.'
+        : resettingPassword
+          ? `Enter the reset code sent to ${authEmail} and choose a new password. The code expires in 5 minutes.`
+          : registering
+            ? 'A few details now. Your lovely page in a minute.'
+            : 'Sign in with your username and password.';
+    const authSubmit = verifyingRegistration ? onVerifyRegistration
+      : requestingReset ? onRequestReset
+        : resettingPassword ? onResetPassword
+          : registering ? (event) => submitProfile(event, 'register') : onLogin;
     return (
       <>
         <main className="auth-page">
-          <header className="site-header auth-header"><Brand onClick={() => routeTo('landing')} /><span className="auth-header-note">A SMALL PAGE WITH A LOT OF HEART</span><button className="header-login" type="button" onClick={() => routeTo(registering ? 'login' : 'register')}>{registering ? 'I have a page' : 'New to Tarheta?'}</button></header>
+          <header className="site-header auth-header"><Brand onClick={() => routeTo('landing')} /><span className="auth-header-note">A SMALL PAGE WITH A LOT OF HEART</span><button className="header-login" type="button" onClick={switchAuthPage}>{registering ? 'I have a page' : 'New to Tarheta?'}</button></header>
           <div className="auth-layout">
             <aside className="auth-story"><span className="eyebrow">{registering ? 'START WITH A NAME' : 'GOOD TO HAVE YOU BACK'}</span><h1>{registering ? <>Make a little<br />room for <em>hello.</em></> : <>Your little<br />corner is <em>here.</em></>}</h1><p>{registering ? 'A personal page for the things you want people to remember about you.' : 'Pick up where you left off. Your Tarheta profile is ready.'}</p><div className="auth-card-preview"><span className="card-overline">TARHETA · PERSONAL ID</span><strong>{registering ? 'A name people remember.' : 'Your name, your story.'}</strong><span>tarheta.ph/{username || 'yourname'}</span><div className="preview-stamp">MADE TO BE SHARED</div></div></aside>
-            <section className="auth-card"><button className="back-link" type="button" onClick={() => routeTo('landing')}><ArrowLeft size={15} /> Back to home</button><span className="eyebrow">{registering ? 'LET’S GET YOU STARTED' : 'WELCOME BACK'}</span><h2>{registering ? 'Create your Tarheta' : 'Log in to your page'}</h2><p className="auth-intro">{registering ? 'A few details now. Your lovely page in a minute.' : 'Sign in with your username and password.'}</p>
-              <form onSubmit={registering ? (event) => submitProfile(event, 'register') : onLogin}>
-                {registering && <label className="form-field"><span>Your name <i>Required</i></span><input name="name" required autoComplete="name" placeholder="e.g. Juan Dela Cruz" /></label>}
-                <label className="form-field"><span>Username <i>Required</i></span><div className="username-field"><span>tarheta.ph/</span><input name="username" required minLength="3" maxLength="30" pattern="[a-z0-9._]+" placeholder="yourname" value={registering ? username : undefined} onChange={registering ? (event) => setUsername(event.target.value.toLowerCase()) : undefined} /></div>{registering && <small className={userFeedback.startsWith('Looks good') ? 'field-feedback good' : 'field-feedback'}>{userFeedback}</small>}</label>
-                <label className="form-field"><span>Password <i>Required</i></span><input name="password" type="password" required minLength="8" maxLength="200" autoComplete={registering ? 'new-password' : 'current-password'} placeholder={registering ? 'At least 8 characters' : 'Your password'} /></label>
-                {registering && <>
-                  <div className="form-row"><label className="form-field"><span>Title or role</span><input name="title" placeholder="Designer" /></label><label className="form-field"><span>Organization</span><input name="organization" placeholder="Studio or school" /></label></div>
-                  <label className="form-field"><span>Phone <i>Optional</i></span><input name="phone" type="tel" placeholder="+639171234567" /></label>
-                  <label className="form-field"><span>Email <i>Required</i></span><input name="email" type="email" required placeholder="you@example.com" /></label>
-                  <label className="form-field"><span>A little about you</span><textarea name="bio" maxLength="300" rows="3" placeholder="What would you like people to know?" /></label>
-                  <label className="form-field"><span>Your website <i>Optional</i></span><input name="website" placeholder="https://yourwebsite.com" /></label>
+            <section className="auth-card"><button className="back-link" type="button" onClick={() => routeTo('landing')}><ArrowLeft size={15} /> Back to home</button><span className="eyebrow">{verifyingRegistration || requestingReset || resettingPassword ? 'A QUICK, SECURE CHECK' : registering ? 'LET’S GET YOU STARTED' : 'WELCOME BACK'}</span><h2>{authTitle}</h2><p className="auth-intro">{authIntro}</p>
+              {authMessage && <div className="auth-message" role="status"><ShieldCheck size={16} /><span>{authMessage}</span></div>}
+              {verifyingRegistration && authEmailNote('Sent to your inbox', 'Check spam or junk if it doesn’t arrive.')}
+              {resettingPassword && authEmailNote('Reset code sent', 'Check spam or junk if it doesn’t arrive.')}
+              <form key={`${page}-${authStep}`} onSubmit={authSubmit}>
+                {verifyingRegistration ? <>
+                  <label className="form-field"><span>Verification code</span><input name="code" required inputMode="numeric" pattern="[0-9]{6}" minLength="6" maxLength="6" autoComplete="one-time-code" placeholder="6-digit code" /></label>
+                  <Button variant="coral" type="submit" className="form-submit">Verify email and continue <ArrowRight size={16} /></Button>
+                  <button className="text-link auth-back-action" type="button" onClick={() => onResendCode('registration')}>Resend verification code</button>
+                  <button className="text-link auth-back-action" type="button" onClick={() => { setAuthStep('details'); setAuthEmail(''); }}>Use a different email or edit details</button>
+                </> : requestingReset ? <>
+                  <label className="form-field"><span>Account email</span><input name="email" type="email" required maxLength="254" defaultValue={authEmail} autoComplete="email" placeholder="you@example.com" /></label>
+                  <Button variant="coral" type="submit" className="form-submit">Send reset code <ArrowRight size={16} /></Button>
+                  <button className="text-link auth-back-action" type="button" onClick={() => { setAuthStep('details'); setAuthMessage(''); }}>Back to login</button>
+                </> : resettingPassword ? <>
+                  <label className="form-field"><span>6-digit reset code</span><input name="code" required inputMode="numeric" pattern="[0-9]{6}" minLength="6" maxLength="6" autoComplete="one-time-code" placeholder="6-digit code" /></label>
+                  <label className="form-field"><span>New password</span><input name="newPassword" type="password" required minLength="8" maxLength="200" autoComplete="new-password" placeholder="At least 8 characters" /></label>
+                  <Button variant="coral" type="submit" className="form-submit">Change password <ArrowRight size={16} /></Button>
+                  <button className="text-link auth-back-action" type="button" onClick={() => onResendCode('password_reset')}>Resend reset code</button>
+                  <button className="text-link auth-back-action" type="button" onClick={() => setAuthStep('forgot-email')}>Use a different email</button>
+                </> : <>
+                  {registering && <label className="form-field"><span>Your name <i>Required</i></span><input name="name" required autoComplete="name" placeholder="e.g. Juan Dela Cruz" /></label>}
+                  <label className="form-field"><span>Username <i>Required</i></span><div className="username-field"><span>tarheta.ph/</span><input name="username" required minLength="3" maxLength="30" pattern="[a-z0-9._]+" placeholder="yourname" value={registering ? username : undefined} defaultValue={!registering ? username : undefined} onChange={registering ? (event) => setUsername(event.target.value.toLowerCase()) : undefined} /></div>{registering && <small className={userFeedback.startsWith('Looks good') ? 'field-feedback good' : 'field-feedback'}>{userFeedback}</small>}</label>
+                  <label className="form-field"><span>Password <i>Required</i></span><input name="password" type="password" required minLength="8" maxLength="200" autoComplete={registering ? 'new-password' : 'current-password'} placeholder={registering ? 'At least 8 characters' : 'Your password'} /></label>
+                  {registering && <>
+                    <div className="form-row"><label className="form-field"><span>Title or role</span><input name="title" placeholder="Designer" /></label><label className="form-field"><span>Organization</span><input name="organization" placeholder="Studio or school" /></label></div>
+                    <label className="form-field"><span>Phone <i>Optional</i></span><input name="phone" type="tel" placeholder="+639171234567" /></label>
+                    <label className="form-field"><span>Email <i>Required</i></span><input name="email" type="email" required placeholder="you@example.com" /></label>
+                    <label className="form-field"><span>A little about you</span><textarea name="bio" maxLength="300" rows="3" placeholder="What would you like people to know?" /></label>
+                    <label className="form-field"><span>Your website <i>Optional</i></span><input name="website" placeholder="https://yourwebsite.com" /></label>
+                  </>}
+                  {!registering && <button className="text-link auth-forgot-link" type="button" onClick={() => { setAuthEmail(''); setAuthMessage(''); setAuthStep('forgot-email'); }}>Forgot your password?</button>}
+                  <Button variant="coral" type="submit" className="form-submit">{registering ? 'Send verification code' : 'Open my page'} <ArrowRight size={16} /></Button>
                 </>}
-                <Button variant="coral" type="submit" className="form-submit">{registering ? 'Create my page' : 'Open my page'} <ArrowRight size={16} /></Button>
               </form>
-              <p className="auth-switch">{registering ? 'Already made a page?' : 'First time here?'} <button type="button" onClick={() => routeTo(registering ? 'login' : 'register')}>{registering ? 'Log in' : 'Make your page'}</button></p>
+              {(!verifyingRegistration && !requestingReset && !resettingPassword) && <p className="auth-switch">{registering ? 'Already made a page?' : 'First time here?'} <button type="button" onClick={switchAuthPage}>{registering ? 'Log in' : 'Make your page'}</button></p>}
               <p className="prototype-note"><ShieldCheck size={14} /> Your profile is saved securely to your account.</p>
             </section>
           </div>

@@ -16,11 +16,24 @@ The original root-level `script.js` and `style.css` are retained as inactive pro
 ## Neon and Vercel setup
 
 1. Create a Neon Postgres database using the Neon integration from the Vercel project dashboard.
-2. Make sure `DATABASE_URL` is available in the Vercel Development, Preview, and Production environments.
+2. Make sure `DATABASE_URL` is available in Vercel Production and Preview. Add Development too if you want to run the serverless API locally.
 3. Link the project locally and pull the `DATABASE_URL` variable with `npx vercel link` and `npx vercel env pull .env.local`.
 4. Deploy with `npx vercel --prod`.
 
-The API creates its tables on the first request. Accounts, salted password hashes, profile content, session records, and profile-view counts are stored in Neon. Passwords are hashed server-side, and login uses an HTTP-only session cookie. The database connection string must only be configured as a server-side environment variable; never add it to a `VITE_` variable or frontend code.
+The API creates its tables on the first request. Accounts, verified account email addresses, salted password hashes, profile content, short-lived email challenges, session records, and profile-view counts are stored in Neon. Passwords are hashed server-side, and login uses an HTTP-only session cookie. New sign-ups must verify an email code before the account is created. Password recovery also uses an email code; both codes expire after five minutes and allow a limited number of attempts.
+
+Verification and recovery messages are sent through the Gmail API as `tarheta.noreply@gmail.com`. This uses HTTPS (not SMTP), which works with Vercel Functions. Configure `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, and `GMAIL_REFRESH_TOKEN` as server-side Vercel environment variables alongside `DATABASE_URL`. Never use a `VITE_` prefix or put these credentials in frontend code.
+
+To create Gmail API credentials:
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create or select a project, then enable **Gmail API** under **APIs & Services → Library**.
+2. Configure the OAuth consent screen. Sign in as `tarheta.noreply@gmail.com`; if the consent screen is in Testing mode, add that account as a test user. Testing-mode refresh tokens expire after seven days, so set the app to Production for ongoing use and complete any Google verification requirements shown for the Gmail sending scope.
+3. Under **APIs & Services → Credentials**, create an OAuth client ID. Use a Web application client and add `https://developers.google.com/oauthplayground` as an authorized redirect URI.
+4. Open [OAuth 2.0 Playground](https://developers.google.com/oauthplayground), open its settings, enable **Use your own OAuth credentials**, and enter the OAuth client ID and secret.
+5. In Step 1, authorize `https://www.googleapis.com/auth/gmail.send` while signed in as `tarheta.noreply@gmail.com`. In Step 2, exchange the authorization code and copy the refresh token.
+6. Add the client ID, client secret, and refresh token to the Vercel project's **Settings → Environment Variables** for Production and Preview. Add Development too for local email testing. Treat all three as secrets. Redeploy after adding or changing them.
+
+The database connection string must only be configured as a server-side environment variable; never add it to a `VITE_` variable or frontend code.
 
 Run `npm run dev` to use Vercel's local function runtime alongside the Vite frontend. It requires the project to be linked and `DATABASE_URL` to be present in `.env.local`.
 
@@ -38,6 +51,7 @@ Open `/?u=demo` on a phone (or deploy the app to a reachable HTTPS URL). **Call*
 - Social metadata is updated client-side; most messaging crawlers need server-rendered or pre-rendered profile metadata to create per-profile previews.
 - The current card system stores URL values in the browser. It does not provide secure file uploads or media hosting.
 - Existing accounts and profiles saved in an earlier browser `localStorage` version are not automatically imported into Neon.
+- The verified account email used for password recovery is separate from the public contact email shown on the profile.
 
 ## Recommended next steps
 
