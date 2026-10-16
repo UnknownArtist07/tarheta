@@ -204,8 +204,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .public-back-button:hover { color: var(--paper); }
 .identity-card:focus-visible { outline: 2px solid var(--coral-bright); outline-offset: 4px; }
 .identity-card-front { background: var(--calling-front-background,var(--calling-front-color)); color: var(--calling-front-text-color); }
+.identity-card-back { background: var(--calling-back-background,var(--calling-back-color)); }
 .identity-card-front .identity-card-copy strong { color: var(--calling-front-name-color,var(--calling-front-text-color)); }
 .card-front-transparent .identity-card-front::after,.card-front-transparent .identity-card-front .card-decoration { display: none; }
+.card-front-transparent .identity-card-front .calling-card-background,.card-back-transparent .identity-card-back .calling-card-background { opacity: 1; }
 .auth-email-note,.auth-message { display: flex; align-items: flex-start; gap: 11px; padding: 13px; border: 1px solid rgba(244,240,230,.14); border-radius: 5px; background: rgba(255,255,255,.035); color: #e5e1d7; }
 .auth-email-note > svg,.auth-message > svg { flex: 0 0 auto; margin-top: 1px; color: #ef9b84; }
 .auth-email-note > span { display: flex; flex-direction: column; gap: 4px; }

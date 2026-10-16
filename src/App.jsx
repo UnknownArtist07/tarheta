@@ -23,6 +23,7 @@ const DEFAULT_APPEARANCE = {
   cardFrontTextColor: '#252720',
   cardFrontNameColor: '#252720',
   cardFrontTransparent: false,
+  cardBackTransparent: false,
   cardFrontLabel: 'TARHETA · PERSONAL ID',
   cardFrontFooter: 'TARHETA.PH',
   cardBackColor: '#313631',
@@ -45,6 +46,7 @@ function getAppearance(profile) {
     if (!/^#[\da-f]{6}$/i.test(appearance[key])) appearance[key] = DEFAULT_APPEARANCE[key] || THEME_PRESETS[preset][key];
   }
   appearance.cardFrontTransparent = Boolean(appearance.cardFrontTransparent);
+  appearance.cardBackTransparent = Boolean(appearance.cardBackTransparent);
   appearance.cardBackgroundImage = isSafeWebUrl(appearance.cardBackgroundImage) ? appearance.cardBackgroundImage : '';
   return appearance;
 }
@@ -105,10 +107,11 @@ function AppearancePanel({ profile, onSave }) {
           <label className="form-field"><span>Front color</span><input name="cardFrontColor" type="color" value={appearance.cardFrontColor} onChange={updateField} disabled={appearance.cardFrontTransparent} /></label>
           <label className="form-field"><span>Front text</span><input name="cardFrontTextColor" type="color" value={appearance.cardFrontTextColor} onChange={updateField} /></label>
           <label className="form-field"><span>Name text</span><input name="cardFrontNameColor" type="color" value={appearance.cardFrontNameColor} onChange={updateField} /></label>
-          <label className="form-field"><span>Back color</span><input name="cardBackColor" type="color" value={appearance.cardBackColor} onChange={updateField} /></label>
+          <label className="form-field"><span>Back color</span><input name="cardBackColor" type="color" value={appearance.cardBackColor} onChange={updateField} disabled={appearance.cardBackTransparent} /></label>
           <label className="form-field"><span>Back text</span><input name="cardBackTextColor" type="color" value={appearance.cardBackTextColor} onChange={updateField} /></label>
         </div>
         <label className="visibility-choice"><input name="cardFrontTransparent" type="checkbox" checked={appearance.cardFrontTransparent} onChange={updateField} /><span><strong>Transparent front</strong><small>Show the page behind the front of your calling card.</small></span></label>
+        <label className="visibility-choice"><input name="cardBackTransparent" type="checkbox" checked={appearance.cardBackTransparent} onChange={updateField} /><span><strong>Transparent back</strong><small>Show the page behind the back of your calling card.</small></span></label>
         <label className="form-field"><span>Front footer label</span><input name="cardFrontFooter" maxLength="30" value={appearance.cardFrontFooter} onChange={updateField} /></label>
         <label className="form-field"><span>Back label</span><input name="cardBackLabel" maxLength="50" value={appearance.cardBackLabel} onChange={updateField} /></label>
         <label className="form-field"><span>Back footer label</span><input name="cardBackFooter" maxLength="50" value={appearance.cardBackFooter} onChange={updateField} /></label>
@@ -293,6 +296,7 @@ function ProfileCard({ profile, flip, flipped = false, compact = false }) {
     '--calling-front-text-color': appearance.cardFrontTextColor,
     '--calling-front-name-color': appearance.cardFrontNameColor,
     '--calling-back-color': appearance.cardBackColor,
+    '--calling-back-background': appearance.cardBackTransparent ? 'transparent' : appearance.cardBackColor,
     '--calling-back-text-color': appearance.cardBackTextColor,
   };
   const details = [
@@ -303,7 +307,7 @@ function ProfileCard({ profile, flip, flipped = false, compact = false }) {
   ].filter(([, value]) => value);
   return (
     <div
-      className={`identity-card ${appearance.cardFrontTransparent ? 'card-front-transparent' : ''} ${compact ? 'identity-card-compact' : ''} ${flipped ? 'is-flipped' : ''}`}
+      className={`identity-card ${appearance.cardFrontTransparent ? 'card-front-transparent' : ''} ${appearance.cardBackTransparent ? 'card-back-transparent' : ''} ${compact ? 'identity-card-compact' : ''} ${flipped ? 'is-flipped' : ''}`}
       style={cardStyle}
       role="button"
       tabIndex={0}
