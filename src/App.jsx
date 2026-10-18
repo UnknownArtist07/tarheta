@@ -370,10 +370,15 @@ function ProfileCard({ profile, flip, flipped = false, compact = false }) {
   );
 }
 
-function ProfileTile({ card, owner = false, onEdit, onDelete, onMove, onKeyMove, style }) {
+function ProfileTile({ card, owner = false, onEdit, onDelete, onMove, onKeyMove, onOpenSchedule, style }) {
   const MetaIcon = CARD_META[card.type]?.icon || Link2;
   const href = cardDestination(card);
+  const canOpenSchedule = !owner && card.type === 'schedule' && onOpenSchedule;
   const click = () => {
+    if (canOpenSchedule) {
+      onOpenSchedule(card);
+      return;
+    }
     if (!href) return;
     if (href.startsWith('tel:') || href.startsWith('mailto:')) window.location.href = href;
     else window.open(href, '_blank', 'noopener,noreferrer');
@@ -390,24 +395,24 @@ function ProfileTile({ card, owner = false, onEdit, onDelete, onMove, onKeyMove,
         '--tile-text-color': /^#[\da-f]{6}$/i.test(card.textColor || '') ? card.textColor : undefined,
       }}
       data-card-id={card.id}
-      tabIndex={owner ? 0 : undefined}
-      onClick={!owner && href ? click : undefined}
+      tabIndex={owner || (!href && !canOpenSchedule) ? undefined : 0}
+      onClick={!owner && (href || canOpenSchedule) ? click : undefined}
       onKeyDown={(event) => {
         if (owner && event.altKey && ['ArrowUp', 'ArrowDown'].includes(event.key)) {
           event.preventDefault();
           onKeyMove(card.id, event.key === 'ArrowUp' ? -1 : 1);
-        } else if (!owner && href && ['Enter', ' '].includes(event.key)) {
+        } else if (!owner && (href || canOpenSchedule) && ['Enter', ' '].includes(event.key)) {
           event.preventDefault();
           click();
         }
       }}
-      role={owner ? 'group' : href ? 'link' : undefined}
-      aria-label={owner ? `${card.title}, press Alt and an arrow key to reorder` : card.title}
+      role={owner ? 'group' : canOpenSchedule ? 'button' : href ? 'link' : undefined}
+      aria-label={owner ? `${card.title}, press Alt and an arrow key to reorder` : canOpenSchedule ? `View ${card.title} schedule` : card.title}
     >
       {isSafeWebUrl(card.backgroundImage) && <img className="tile-background-image" src={card.backgroundImage} alt="" loading="lazy" />}
       {imageCard && <img className="tile-image" src={card.value} alt="" loading="lazy" width="640" height="420" />}
       <span className="tile-type"><MetaIcon size={14} /> {CARD_META[card.type]?.label || 'CARD'} {owner && !card.isPublic && <span className="private-tag">PRIVATE</span>}</span>
-      <span className={`tile-copy ${card.type === 'schedule' ? 'tile-copy-schedule' : ''}`}><strong>{card.title}</strong>{card.type === 'schedule' ? <span className="tile-schedule-list">{schedules.map((schedule, index) => <span className="tile-schedule-entry" key={`${schedule.subjectName}-${index}`}><strong>{schedule.subjectName}</strong><small>{getScheduleWeekday(schedule) || schedule.date} · {formatScheduleTime(schedule.startTime || schedule.time)}{schedule.endTime ? ` - ${formatScheduleTime(schedule.endTime)}` : ''}{schedule.professor ? ` · ${schedule.professor}` : ''}</small></span>)}</span> : <small>{card.type === 'phone' || card.type === 'email' ? card.value : card.value.replace(/^https?:\/\//, '')}</small>}</span>
+      <span className="tile-copy"><strong>{card.title}</strong>{card.type === 'schedule' ? <small>{owner ? `${schedules.length} ${schedules.length === 1 ? 'class' : 'classes'}` : 'Click to view class schedule'}</small> : <small>{card.type === 'phone' || card.type === 'email' ? card.value : card.value.replace(/^https?:\/\//, '')}</small>}</span>
       <span className="tile-bottom"><span className="tile-spark" /><span className="tile-open">{card.type === 'schedule' ? 'SCHEDULE' : card.type === 'video' ? 'PLAY' : card.type === 'phone' ? 'CALL' : 'OPEN'} {card.type !== 'schedule' && <ArrowUpRight size={15} />}</span></span>
       {owner && (
         <>
@@ -512,7 +517,7 @@ function QRPanel({ url, onCopy }) {
   );
 }
 
-function Modal({ title, open, onClose, children, className = '' }) {
+function Modal({ title, open, onClose, children, className = '', eyebrow = 'TARHETA STUDIO' }) {
   const ref = useRef(null);
   useEffect(() => {
     const dialog = ref.current;
@@ -523,9 +528,26 @@ function Modal({ title, open, onClose, children, className = '' }) {
   }, [open]);
   return (
     <dialog ref={ref} className={`dialog ${className}`} onClose={onClose} onCancel={(event) => { event.preventDefault(); onClose(); }}>
-      <div className="dialog-heading"><div><span className="eyebrow">TARHETA STUDIO</span><h2>{title}</h2></div><button className="icon-button" type="button" onClick={onClose} aria-label="Close dialog"><X size={18} /></button></div>
+      <div className="dialog-heading"><div><span className="eyebrow">{eyebrow}</span><h2>{title}</h2></div><button className="icon-button" type="button" onClick={onClose} aria-label="Close dialog"><X size={18} /></button></div>
       {children}
     </dialog>
+  );
+}
+
+function ScheduleDialog({ card, onClose }) {
+  const schedules = Array.isArray(card?.schedules) ? card.schedules : [];
+  return (
+    <Modal title={card?.title || 'Class schedule'} eyebrow="WEEKLY CLASS SCHEDULE" open={Boolean(card)} onClose={onClose} className="schedule-dialog">
+      <ol className="schedule-dialog-list">
+        {schedules.map((schedule, index) => (
+          <li key={`${schedule.subjectName}-${index}`}>
+            <strong>{schedule.subjectName}</strong>
+            <span>{getScheduleWeekday(schedule) || schedule.date} · {formatScheduleTime(schedule.startTime || schedule.time)}{schedule.endTime ? ` - ${formatScheduleTime(schedule.endTime)}` : ''}</span>
+            {schedule.professor && <small>{schedule.professor}</small>}
+          </li>
+        ))}
+      </ol>
+    </Modal>
   );
 }
 
@@ -540,6 +562,7 @@ function App() {
   const [authMessage, setAuthMessage] = useState('');
   const [cardDialog, setCardDialog] = useState(false);
   const [contactDialog, setContactDialog] = useState('');
+  const [scheduleDialog, setScheduleDialog] = useState(null);
   const [cardEditing, setCardEditing] = useState(null);
   const [flipped, setFlipped] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -981,7 +1004,7 @@ function App() {
           <ProfileCard profile={profile} flipped={flipped} flip={() => setFlipped((current) => !current)} />
           <div className="section-title-row"><div><span className="eyebrow">A FEW MORE THINGS</span><h2>Elsewhere, online.</h2></div><span className="count-pill">{profile.cards.filter((card) => card.isPublic).length.toString().padStart(2, '0')} LINKS</span></div>
           <div className="public-card-grid">
-            {profile.cards.filter((card) => card.isPublic).map((card, index) => <ProfileTile key={card.id} card={card} style={{ '--tile-index': index }} />)}
+            {profile.cards.filter((card) => card.isPublic).map((card, index) => <ProfileTile key={card.id} card={card} onOpenSchedule={setScheduleDialog} style={{ '--tile-index': index }} />)}
             {profile.website && <a className="website-feature" href={profile.website} target="_blank" rel="noreferrer"><span className="website-icon"><Globe2 size={20} /></span><span><small>MY CORNER OF THE INTERNET</small><strong>Visit my website</strong></span><ArrowUpRight size={18} /></a>}
           </div>
           <footer className="public-footer"><Brand onClick={() => { changeAddress(); routeTo('landing'); }} /><span>A PERSONAL PAGE BY TARHETA</span><button type="button" onClick={shareProfile}><Share2 size={15} /> PASS IT ON</button></footer>
@@ -996,6 +1019,7 @@ function App() {
           <QRCodeCanvas value={profileHref} size={132} bgColor="#f4f0e6" fgColor="#171a1f" level="M" includeMargin />
           <div className="dialog-actions"><Button variant="outline" onClick={() => copyText(profile.phone, 'Phone number copied.')}><Copy size={15} /> Copy number</Button><Button variant="coral" onClick={() => setContactDialog('')}>Done</Button></div>
         </Modal>
+        <ScheduleDialog card={scheduleDialog} onClose={() => setScheduleDialog(null)} />
       </main>
     );
   };
@@ -1192,7 +1216,7 @@ function App() {
           <section className="owner-main"><header className="owner-topbar"><div><span className="eyebrow">YOUR TARHETA / {profile.username.toUpperCase()}</span><h1>{section === 'card' ? 'Your calling card' : section === 'cards' ? 'Your little collection' : section === 'appearance' ? 'Make it yours' : section === 'profile' ? 'Your profile' : 'Ready to share?'}</h1></div><div className="owner-top-actions"><button className="button button-outline" onClick={() => section === 'appearance' ? setSection('card') : copyProfile()}>{section === 'appearance' ? <><UserRound size={15} /> Preview my card</> : <><Copy size={15} /> Copy profile link</>}</button><button className="icon-button" onClick={() => setSection('profile')} aria-label="Edit profile"><Pencil size={17} /></button></div></header>
             <div className="mobile-owner-tabs"><button className={section === 'card' ? 'selected' : ''} onClick={() => setSection('card')}>Card</button><button className={section === 'cards' ? 'selected' : ''} onClick={() => setSection('cards')}>Links</button><button className={section === 'tools' ? 'selected' : ''} onClick={() => setSection('tools')}>Share</button><button className={section === 'appearance' ? 'selected' : ''} onClick={() => setSection('appearance')}>Theme</button></div>
             {section === 'card' && <div className="owner-card-section"><div className="owner-note"><span className="status-dot" /> YOUR PAGE IS LOOKING GOOD <span className="owner-views">{Number(profile.views) || 0} local views</span></div><div className="owner-card-center"><ProfileCard profile={profile} flipped={flipped} flip={() => setFlipped((value) => !value)} /><div className="owner-card-help"><span className="flip-icon">↻</span><span><strong>Give it a little tap</strong><small>This card flips over to show your contact details.</small></span><button className="icon-button" onClick={() => setSection('profile')} aria-label="Edit profile details"><Pencil size={16} /></button></div></div><div className="dashboard-bottom"><div><span className="eyebrow">YOUR PAGE ADDRESS</span><p className="share-address">{profileHref}</p></div><Button variant="coral" onClick={() => openPublic(profile.username, { addHistory: true })}>Visit public page <ArrowUpRight size={15} /></Button></div></div>}
-            {section === 'cards' &&                         <div className="owner-links-layout"><section className="card-manager"><div className="collection-heading"><div><span className="eyebrow">THE THINGS YOU SHARE</span><h2>Your collection</h2><p>Arrange your links, work, and favorite places.</p></div><Button variant="coral" onClick={() => beginCardEdit()}><Plus size={16} /> Add a card</Button></div><div className="owner-card-list" ref={ownerCardsRef}>{visibleCards.map((card, index) => <div className="draggable-row" key={card.id} draggable onDragOver={(event) => event.preventDefault()} onDragStart={(event) => onDragStart(event, card.id)} onDrop={(event) => onDrop(event, card.id)}><ProfileTile card={card} owner onEdit={beginCardEdit} onDelete={removeCard} onMove={moveCard} onKeyMove={moveCard} /><span className="row-order">{String(index + 1).padStart(2, '0')}</span></div>)}</div></section><aside className="live-preview"><div className="preview-label"><span className="status-dot" /> PUBLIC PREVIEW <ArrowUpRight size={15} /></div><div className="mini-profile"><ProfileAvatar profile={profile} /><div><strong>{profile.name}</strong><span>{getHeadline(profile)}</span></div></div><p>{profile.bio}</p><ProfileCard compact profile={profile} flip={() => setFlipped((value) => !value)} flipped={flipped} /><div className="preview-tile-list">{visibleCards.filter((card) => card.isPublic).map((card) => <ProfileTile key={card.id} card={card} />)}{visibleCards.some((card) => !card.isPublic) && <span className="hidden-cards-note"><ShieldCheck size={14} /> {visibleCards.filter((card) => !card.isPublic).length} private {visibleCards.filter((card) => !card.isPublic).length === 1 ? 'card' : 'cards'} hidden from your public page</span>}</div></aside></div>}
+            {section === 'cards' &&                         <div className="owner-links-layout"><section className="card-manager"><div className="collection-heading"><div><span className="eyebrow">THE THINGS YOU SHARE</span><h2>Your collection</h2><p>Arrange your links, work, and favorite places.</p></div><Button variant="coral" onClick={() => beginCardEdit()}><Plus size={16} /> Add a card</Button></div><div className="owner-card-list" ref={ownerCardsRef}>{visibleCards.map((card, index) => <div className="draggable-row" key={card.id} draggable onDragOver={(event) => event.preventDefault()} onDragStart={(event) => onDragStart(event, card.id)} onDrop={(event) => onDrop(event, card.id)}><ProfileTile card={card} owner onEdit={beginCardEdit} onDelete={removeCard} onMove={moveCard} onKeyMove={moveCard} /><span className="row-order">{String(index + 1).padStart(2, '0')}</span></div>)}</div></section><aside className="live-preview"><div className="preview-label"><span className="status-dot" /> PUBLIC PREVIEW <ArrowUpRight size={15} /></div><div className="mini-profile"><ProfileAvatar profile={profile} /><div><strong>{profile.name}</strong><span>{getHeadline(profile)}</span></div></div><p>{profile.bio}</p><ProfileCard compact profile={profile} flip={() => setFlipped((value) => !value)} flipped={flipped} /><div className="preview-tile-list">{visibleCards.filter((card) => card.isPublic).map((card) => <ProfileTile key={card.id} card={card} onOpenSchedule={setScheduleDialog} />)}{visibleCards.some((card) => !card.isPublic) && <span className="hidden-cards-note"><ShieldCheck size={14} /> {visibleCards.filter((card) => !card.isPublic).length} private {visibleCards.filter((card) => !card.isPublic).length === 1 ? 'card' : 'cards'} hidden from your public page</span>}</div></aside></div>}
             {section === 'tools' && <div className="tools-layout"><div className="tools-copy"><span className="eyebrow">GOOD THINGS TRAVEL</span><h2>Send your page<br /><em>into the world.</em></h2><p>Copy the link into a message or let someone scan your QR code. Either way, you’re easy to find.</p><Button variant="coral" onClick={copyProfile}><Copy size={15} /> Copy my link</Button><div className="local-metric"><span>{Number(profile.views) || 0}</span><div><strong>profile opens</strong><small>A local demo counter, just for this browser.</small></div></div></div><div className="tools-qr-card"><span className="eyebrow">A LITTLE DOOR BACK TO YOU</span><QRCodeCanvas value={profileHref} size={210} bgColor="#f4f0e6" fgColor="#171a1f" level="M" includeMargin /><strong>Scan to open my Tarheta</strong><span>tarheta.ph/{profile.username}</span><button className="text-link" onClick={(event) => { const canvas = event.currentTarget.parentElement.querySelector('canvas'); const a = document.createElement('a'); a.href = canvas.toDataURL(); a.download = `${profile.username}-qr.png`; a.click(); }}><Download size={15} /> Download QR code</button></div></div>}
             {section === 'appearance' && <AppearancePanel profile={profile} onSave={saveAppearance} />}
             {section === 'profile' && <ProfileSettings profile={profile} onProfileSave={(event) => submitProfile(event, 'edit')} onSocialSave={submitSocialLinks} onPhotoChange={changeProfilePhoto} onRemovePhoto={removeProfilePhoto} onPasswordChange={changePassword} />}
@@ -1200,6 +1224,7 @@ function App() {
           <nav className="owner-mobile-nav"><button className={section === 'card' ? 'selected' : ''} onClick={() => setSection('card')}><UserRound size={18} />Card</button><button className={section === 'cards' ? 'selected' : ''} onClick={() => setSection('cards')}><Link2 size={18} />Links</button><button className={section === 'tools' ? 'selected' : ''} onClick={() => setSection('tools')}><QrCode size={18} />Share</button><button className={section === 'appearance' ? 'selected' : ''} onClick={() => setSection('appearance')}><Palette size={18} />Theme</button><button className={section === 'profile' ? 'selected' : ''} onClick={() => setSection('profile')}><UserRound size={18} />Profile</button></nav>
         </main>
         <Modal title={cardEditing ? 'Tweak this card' : 'Add to your collection'} open={cardDialog} onClose={() => { setCardDialog(false); setCardEditing(null); }}><CardEditorForm key={`${cardDialog}-${cardEditing?.id || 'new'}`} cardEditing={cardEditing} onSubmit={submitCard} /></Modal>
+        <ScheduleDialog card={scheduleDialog} onClose={() => setScheduleDialog(null)} />
         <Toast message={toast} />
       </>
     );
