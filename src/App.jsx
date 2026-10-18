@@ -8,6 +8,8 @@ import {
 import { QRCodeCanvas } from 'qrcode.react';
 
 const RESERVED = new Set(['admin', 'support', 'login', 'api', 'tarheta', 'help', 'about', 'settings']);
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const WEEKDAYS_BY_DATE = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const EMPTY_PROFILE = { name: '', username: '', title: '', organization: '', phone: '', email: '', bio: '', website: '' };
 const THEME_PRESETS = {
   midnight: { backgroundColor: '#171a1f', surfaceColor: '#22262b', textColor: '#f4f0e6', accentColor: '#c65b43' },
@@ -32,6 +34,28 @@ const DEFAULT_APPEARANCE = {
   cardBackFooter: 'GLAD WE CONNECTED',
   cardBackgroundImage: '',
 };
+
+function getScheduleWeekday(schedule) {
+  if (WEEKDAYS.includes(schedule.day)) return schedule.day;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(schedule.date || '')) return '';
+  const [year, month, day] = schedule.date.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return '';
+  return WEEKDAYS_BY_DATE[date.getDay()];
+}
+
+function formatScheduleTime(time) {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time || '');
+  if (!match) return time || '';
+  const hour = Number(match[1]);
+  return `${hour % 12 || 12}:${match[2]} ${hour < 12 ? 'AM' : 'PM'}`;
+}
+
+function isValidScheduleTimeRange(startTime, endTime) {
+  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(startTime)
+    && /^([01]\d|2[0-3]):([0-5]\d)$/.test(endTime)
+    && startTime < endTime;
+}
 
 function getAppearance(profile) {
   const saved = profile?.appearance || {};
@@ -383,7 +407,7 @@ function ProfileTile({ card, owner = false, onEdit, onDelete, onMove, onKeyMove,
       {isSafeWebUrl(card.backgroundImage) && <img className="tile-background-image" src={card.backgroundImage} alt="" loading="lazy" />}
       {imageCard && <img className="tile-image" src={card.value} alt="" loading="lazy" width="640" height="420" />}
       <span className="tile-type"><MetaIcon size={14} /> {CARD_META[card.type]?.label || 'CARD'} {owner && !card.isPublic && <span className="private-tag">PRIVATE</span>}</span>
-      <span className={`tile-copy ${card.type === 'schedule' ? 'tile-copy-schedule' : ''}`}><strong>{card.title}</strong>{card.type === 'schedule' ? <span className="tile-schedule-list">{schedules.map((schedule, index) => <span className="tile-schedule-entry" key={`${schedule.subjectName}-${index}`}><strong>{schedule.subjectName}</strong><small>{schedule.date} · {schedule.time}{schedule.professor ? ` · ${schedule.professor}` : ''}</small></span>)}</span> : <small>{card.type === 'phone' || card.type === 'email' ? card.value : card.value.replace(/^https?:\/\//, '')}</small>}</span>
+      <span className={`tile-copy ${card.type === 'schedule' ? 'tile-copy-schedule' : ''}`}><strong>{card.title}</strong>{card.type === 'schedule' ? <span className="tile-schedule-list">{schedules.map((schedule, index) => <span className="tile-schedule-entry" key={`${schedule.subjectName}-${index}`}><strong>{schedule.subjectName}</strong><small>{getScheduleWeekday(schedule) || schedule.date} · {formatScheduleTime(schedule.startTime || schedule.time)}{schedule.endTime ? ` - ${formatScheduleTime(schedule.endTime)}` : ''}{schedule.professor ? ` · ${schedule.professor}` : ''}</small></span>)}</span> : <small>{card.type === 'phone' || card.type === 'email' ? card.value : card.value.replace(/^https?:\/\//, '')}</small>}</span>
       <span className="tile-bottom"><span className="tile-spark" /><span className="tile-open">{card.type === 'schedule' ? 'SCHEDULE' : card.type === 'video' ? 'PLAY' : card.type === 'phone' ? 'CALL' : 'OPEN'} {card.type !== 'schedule' && <ArrowUpRight size={15} />}</span></span>
       {owner && (
         <>
@@ -415,7 +439,7 @@ function CardEditorForm({ cardEditing, onSubmit }) {
           <label className="form-field"><span>Number of subjects</span><select name="scheduleCount" value={scheduleCount} onChange={(event) => setScheduleCount(Number(event.target.value))}>{Array.from({ length: 15 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1} {index === 0 ? 'subject' : 'subjects'}</option>)}</select></label>
           {Array.from({ length: scheduleCount }, (_, index) => {
             const schedule = existingSchedules[index] || {};
-            return <fieldset className="schedule-subject" key={index}><legend>Subject {index + 1}</legend><label className="form-field"><span>Subject name</span><input name={`subjectName-${index}`} required maxLength="100" defaultValue={schedule.subjectName || ''} placeholder="e.g. Introduction to Psychology" /></label><div className="form-row"><label className="form-field"><span>Date</span><input name={`subjectDate-${index}`} type="date" required defaultValue={schedule.date || ''} /></label><label className="form-field"><span>Time</span><input name={`subjectTime-${index}`} type="time" required defaultValue={schedule.time || ''} /></label></div><label className="form-field"><span>Professor <i>Optional</i></span><input name={`subjectProfessor-${index}`} maxLength="100" defaultValue={schedule.professor || ''} placeholder="Professor name" /></label></fieldset>;
+            return <fieldset className="schedule-subject" key={index}><legend>Subject {index + 1}</legend><label className="form-field"><span>Subject name</span><input name={`subjectName-${index}`} required maxLength="100" defaultValue={schedule.subjectName || ''} placeholder="e.g. Introduction to Psychology" /></label><label className="form-field"><span>Day of week</span><select name={`subjectDay-${index}`} required defaultValue={getScheduleWeekday(schedule)}><option value="" disabled>Choose a day</option>{WEEKDAYS.map((day) => <option key={day} value={day}>{day}</option>)}</select></label><div className="form-row"><label className="form-field"><span>Start time</span><input name={`subjectStartTime-${index}`} type="time" required defaultValue={schedule.startTime || schedule.time || ''} /></label><label className="form-field"><span>End time</span><input name={`subjectEndTime-${index}`} type="time" required defaultValue={schedule.endTime || ''} /></label></div><label className="form-field"><span>Professor <i>Optional</i></span><input name={`subjectProfessor-${index}`} maxLength="100" defaultValue={schedule.professor || ''} placeholder="Professor name" /></label></fieldset>;
           })}
         </section>
       ) : (
@@ -856,13 +880,14 @@ function App() {
     const schedules = type === 'schedule'
       ? Array.from({ length: scheduleCount }, (_, index) => ({
         subjectName: String(data[`subjectName-${index}`] || '').trim(),
-        date: String(data[`subjectDate-${index}`] || ''),
-        time: String(data[`subjectTime-${index}`] || ''),
+        day: String(data[`subjectDay-${index}`] || ''),
+        startTime: String(data[`subjectStartTime-${index}`] || ''),
+        endTime: String(data[`subjectEndTime-${index}`] || ''),
         professor: String(data[`subjectProfessor-${index}`] || '').trim(),
       }))
       : undefined;
-    if (type === 'schedule' && (!Number.isInteger(scheduleCount) || scheduleCount < 1 || scheduleCount > 15 || schedules.some((schedule) => !schedule.subjectName || !schedule.date || !schedule.time))) {
-      return showToast('Add between 1 and 15 subjects, each with a name, date, and time.');
+    if (type === 'schedule' && (!Number.isInteger(scheduleCount) || scheduleCount < 1 || scheduleCount > 15 || schedules.some((schedule) => !schedule.subjectName || !WEEKDAYS.includes(schedule.day) || !isValidScheduleTimeRange(schedule.startTime, schedule.endTime)))) {
+      return showToast('Each subject needs a name, weekday, and valid start and end times.');
     }
     const id = data.id || (window.crypto?.randomUUID?.() || `card-${Date.now()}`);
     const nextCard = { id, title: String(data.title || '').trim(), type, value: type === 'schedule' ? '' : value, ...(schedules ? { schedules } : {}), isPublic: data.isPublic === 'on', backgroundColor, textColor, backgroundImage };
