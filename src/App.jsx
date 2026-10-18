@@ -35,6 +35,55 @@ const DEFAULT_APPEARANCE = {
   cardBackgroundImage: '',
 };
 
+const MAX_UPLOAD_FILE_SIZE = 8 * 1024 * 1024;
+const MAX_STORED_IMAGE_LENGTH = 800_000;
+
+function isImageDataUrl(value = '') {
+  return typeof value === 'string'
+    && value.length <= MAX_STORED_IMAGE_LENGTH
+    && /^data:image\/jpeg;base64,[a-z\d+/]+=*$/i.test(value);
+}
+
+function isSafeImageSource(value = '') {
+  return isSafeWebUrl(value) || isImageDataUrl(value);
+}
+
+async function optimizeUploadedImage(file) {
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    throw new Error('Choose a JPG, PNG, or WebP image.');
+  }
+  if (file.size > MAX_UPLOAD_FILE_SIZE) {
+    throw new Error('Choose an image smaller than 8 MB.');
+  }
+  const source = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not read the selected image.'));
+    reader.onerror = () => reject(reader.error || new Error('Could not read the selected image.'));
+    reader.readAsDataURL(file);
+  });
+  const image = await new Promise((resolve, reject) => {
+    const loadedImage = new Image();
+    loadedImage.onload = () => resolve(loadedImage);
+    loadedImage.onerror = () => reject(new Error('The selected file is not a valid image.'));
+    loadedImage.src = source;
+  });
+  let scale = Math.min(1, 1400 / Math.max(image.width, image.height));
+  let quality = 0.82;
+  for (let attempt = 0; attempt < 7; attempt += 1) {
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Could not prepare the selected image.');
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const optimized = canvas.toDataURL('image/jpeg', quality);
+    if (optimized.length <= MAX_STORED_IMAGE_LENGTH) return optimized;
+    scale *= 0.8;
+    quality = Math.max(0.55, quality - 0.05);
+  }
+  throw new Error('Image is too large after optimization. Choose a smaller image.');
+}
+
 function getScheduleWeekday(schedule) {
   if (WEEKDAYS.includes(schedule.day)) return schedule.day;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(schedule.date || '')) return '';
@@ -71,7 +120,7 @@ function getAppearance(profile) {
   }
   appearance.cardFrontTransparent = Boolean(appearance.cardFrontTransparent);
   appearance.cardBackTransparent = Boolean(appearance.cardBackTransparent);
-  appearance.cardBackgroundImage = isSafeWebUrl(appearance.cardBackgroundImage) ? appearance.cardBackgroundImage : '';
+  appearance.cardBackgroundImage = isSafeImageSource(appearance.cardBackgroundImage) ? appearance.cardBackgroundImage : '';
   return appearance;
 }
 
@@ -89,6 +138,7 @@ function appearanceStyle(profile) {
 
 function AppearancePanel({ profile, onSave }) {
   const [appearance, setAppearance] = useState(() => getAppearance(profile));
+  const [imageError, setImageError] = useState('');
   useEffect(() => setAppearance(getAppearance(profile)), [profile.username, profile.appearance]);
 
   const updatePreset = (preset) => {
@@ -103,10 +153,23 @@ function AppearancePanel({ profile, onSave }) {
     const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
     setAppearance((current) => ({ ...current, [name]: value, preset: name.startsWith('card') ? current.preset : 'custom' }));
   };
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault();
-    const data = Object.fromEntries(new FormData(event.currentTarget).entries());
-    onSave({ ...appearance, cardBackgroundImage: String(data.cardBackgroundImage || '').trim() });
+    const form = event.currentTarget;
+    const data = Object.fromEntries(new FormData(form).entries());
+    const imageFile = data.cardBackgroundImageUpload;
+    const url = String(data.cardBackgroundImage || '').trim();
+    let cardBackgroundImage = url || (isImageDataUrl(appearance.cardBackgroundImage) ? appearance.cardBackgroundImage : '');
+    setImageError('');
+    try {
+      if (imageFile instanceof File && imageFile.size) cardBackgroundImage = await optimizeUploadedImage(imageFile);
+    } catch (error) {
+      console.error('Unable to prepare the personal ID background image.', error);
+      setImageError(error.message || 'Could not prepare the selected image.');
+      return;
+    }
+    if (data.removeCardBackgroundImage === 'on' && !url && !(imageFile instanceof File && imageFile.size)) cardBackgroundImage = '';
+    onSave({ ...appearance, cardBackgroundImage });
   };
 
   return (
@@ -139,7 +202,10 @@ function AppearancePanel({ profile, onSave }) {
         <label className="form-field"><span>Front footer label</span><input name="cardFrontFooter" maxLength="30" value={appearance.cardFrontFooter} onChange={updateField} /></label>
         <label className="form-field"><span>Back label</span><input name="cardBackLabel" maxLength="50" value={appearance.cardBackLabel} onChange={updateField} /></label>
         <label className="form-field"><span>Back footer label</span><input name="cardBackFooter" maxLength="50" value={appearance.cardBackFooter} onChange={updateField} /></label>
-        <label className="form-field"><span>Background image URL <i>Optional</i></span><input name="cardBackgroundImage" type="url" value={appearance.cardBackgroundImage} onChange={(event) => setAppearance((current) => ({ ...current, cardBackgroundImage: event.target.value }))} placeholder="https://example.com/background.jpg" /></label>
+        <label className="form-field"><span>Background image URL <i>Optional</i></span><input name="cardBackgroundImage" type="url" value={isSafeWebUrl(appearance.cardBackgroundImage) ? appearance.cardBackgroundImage : ''} onChange={(event) => setAppearance((current) => ({ ...current, cardBackgroundImage: event.target.value }))} placeholder="https://example.com/background.jpg" /></label>
+        <label className="form-field"><span>Or upload from your device <i>JPG, PNG, or WebP · up to 8 MB</i></span><input name="cardBackgroundImageUpload" type="file" accept="image/jpeg,image/png,image/webp" /></label>
+        {isImageDataUrl(appearance.cardBackgroundImage) && <label className="visibility-choice"><input name="removeCardBackgroundImage" type="checkbox" /><span><strong>Remove uploaded background</strong><small>Leave unchecked to keep the current image.</small></span></label>}
+        {imageError && <p className="form-error" role="alert">{imageError}</p>}
       </section>
       <Button variant="coral" type="submit" className="form-submit">Save appearance <Check size={16} /></Button>
     </form>
@@ -313,7 +379,7 @@ function Toast({ message }) {
 
 function ProfileCard({ profile, flip, flipped = false, compact = false }) {
   const appearance = getAppearance(profile);
-  const hasBackground = isSafeWebUrl(appearance.cardBackgroundImage);
+  const hasBackground = isSafeImageSource(appearance.cardBackgroundImage);
   const cardStyle = {
     '--calling-front-color': appearance.cardFrontColor,
     '--calling-front-background': appearance.cardFrontTransparent ? 'transparent' : appearance.cardFrontColor,
@@ -383,9 +449,10 @@ function ProfileTile({ card, owner = false, onEdit, onDelete, onMove, onKeyMove,
     if (href.startsWith('tel:') || href.startsWith('mailto:')) window.location.href = href;
     else window.open(href, '_blank', 'noopener,noreferrer');
   };
-  const imageCard = ['photo', 'payment'].includes(card.type) && isSafeWebUrl(card.value);
+  const imageCard = ['photo', 'payment'].includes(card.type) && isSafeImageSource(card.value);
   const schedules = card.type === 'schedule' && Array.isArray(card.schedules) ? card.schedules : [];
-  const customBackground = /^#[\da-f]{6}$/i.test(card.backgroundColor || '') || isSafeWebUrl(card.backgroundImage) || /^#[\da-f]{6}$/i.test(card.textColor || '');
+  const hasTileBackgroundImage = isSafeImageSource(card.backgroundImage);
+  const customBackground = /^#[\da-f]{6}$/i.test(card.backgroundColor || '') || hasTileBackgroundImage || /^#[\da-f]{6}$/i.test(card.textColor || '');
   return (
     <article
       className={`profile-tile tile-${card.type} ${owner ? 'tile-owner' : ''} ${customBackground ? 'tile-custom-background' : ''}`}
@@ -409,7 +476,7 @@ function ProfileTile({ card, owner = false, onEdit, onDelete, onMove, onKeyMove,
       role={owner ? 'group' : canOpenSchedule ? 'button' : href ? 'link' : undefined}
       aria-label={owner ? `${card.title}, press Alt and an arrow key to reorder` : canOpenSchedule ? `View ${card.title} schedule` : card.title}
     >
-      {isSafeWebUrl(card.backgroundImage) && <img className="tile-background-image" src={card.backgroundImage} alt="" loading="lazy" />}
+      {hasTileBackgroundImage && <img className="tile-background-image" src={card.backgroundImage} alt="" loading="lazy" />}
       {imageCard && <img className="tile-image" src={card.value} alt="" loading="lazy" width="640" height="420" />}
       <span className="tile-type"><MetaIcon size={14} /> {CARD_META[card.type]?.label || 'CARD'} {owner && !card.isPublic && <span className="private-tag">PRIVATE</span>}</span>
       <span className="tile-copy"><strong>{card.title}</strong>{card.type === 'schedule' ? <small>{owner ? `${schedules.length} ${schedules.length === 1 ? 'class' : 'classes'}` : 'Click to view class schedule'}</small> : <small>{card.type === 'phone' || card.type === 'email' ? card.value : card.value.replace(/^https?:\/\//, '')}</small>}</span>
@@ -438,7 +505,7 @@ function CardEditorForm({ cardEditing, onSubmit }) {
     <form className="dialog-form" onSubmit={onSubmit}>
       <input type="hidden" name="id" value={cardEditing?.id || ''} readOnly />
       <label className="form-field"><span>Card title</span><input name="title" required maxLength="80" defaultValue={cardEditing?.title || ''} placeholder="My portfolio" /></label>
-      <label className="form-field"><span>What kind of card?</span><select name="type" value={type} onChange={(event) => setType(event.target.value)}><option value="link">Link</option><option value="phone">Phone</option><option value="email">Email</option><option value="photo">Photo URL</option><option value="video">Video</option><option value="document">Document / résumé</option><option value="location">Location / map</option><option value="payment">Payment QR image</option><option value="schedule">Schedule</option></select></label>
+      <label className="form-field"><span>What kind of card?</span><select name="type" value={type} onChange={(event) => setType(event.target.value)}><option value="link">Link</option><option value="phone">Phone</option><option value="email">Email</option><option value="photo">Photo</option><option value="video">Video</option><option value="document">Document / résumé</option><option value="location">Location / map</option><option value="payment">Payment QR image</option><option value="schedule">Schedule</option></select></label>
       {type === 'schedule' ? (
         <section className="schedule-editor" aria-label="Schedule details">
           <label className="form-field"><span>Number of subjects</span><select name="scheduleCount" value={scheduleCount} onChange={(event) => setScheduleCount(Number(event.target.value))}>{Array.from({ length: 15 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1} {index === 0 ? 'subject' : 'subjects'}</option>)}</select></label>
@@ -448,10 +515,24 @@ function CardEditorForm({ cardEditing, onSubmit }) {
           })}
         </section>
       ) : (
-        <label className="form-field"><span>Address or value</span><input name="value" required defaultValue={cardEditing?.value || ''} placeholder="https://example.com" /></label>
+        <>
+          {type === 'photo' || type === 'payment' ? (
+            <>
+              <label className="form-field"><span>Image URL <i>Optional if uploading</i></span><input name="value" type="url" defaultValue={isSafeWebUrl(cardEditing?.value) ? cardEditing.value : ''} placeholder="https://example.com/image.jpg" /></label>
+              <label className="form-field"><span>Or choose an image from your device <i>JPG, PNG, or WebP · up to 8 MB</i></span><input name="valueUpload" type="file" accept="image/jpeg,image/png,image/webp" /></label>
+              <input type="hidden" name="uploadedValue" value={isImageDataUrl(cardEditing?.value) ? cardEditing.value : ''} readOnly />
+              {isImageDataUrl(cardEditing?.value) && <label className="visibility-choice"><input type="checkbox" name="removeUploadedValue" /><span><strong>Remove uploaded image</strong><small>Leave unchecked to keep the current image.</small></span></label>}
+            </>
+          ) : (
+            <label className="form-field"><span>Address or value</span><input name="value" required defaultValue={cardEditing?.value || ''} placeholder="https://example.com" /></label>
+          )}
+        </>
       )}
       <div className="appearance-color-row"><label className="form-field"><span>Card background</span><input name="backgroundColor" type="color" defaultValue={cardEditing?.backgroundColor || '#25292d'} /></label><label className="form-field"><span>Text color</span><input name="textColor" type="color" defaultValue={cardEditing?.textColor || '#f4f0e6'} /></label></div>
-      <label className="form-field"><span>Background image <i>Optional</i></span><input name="backgroundImage" type="url" defaultValue={cardEditing?.backgroundImage || ''} placeholder="https://example.com/image.jpg" /></label>
+      <label className="form-field"><span>Background image URL <i>Optional</i></span><input name="backgroundImage" type="url" defaultValue={isSafeWebUrl(cardEditing?.backgroundImage) ? cardEditing.backgroundImage : ''} placeholder="https://example.com/image.jpg" /></label>
+      <label className="form-field"><span>Or upload a background from your device <i>JPG, PNG, or WebP · up to 8 MB</i></span><input name="backgroundImageUpload" type="file" accept="image/jpeg,image/png,image/webp" /></label>
+      <input type="hidden" name="uploadedBackgroundImage" value={isImageDataUrl(cardEditing?.backgroundImage) ? cardEditing.backgroundImage : ''} readOnly />
+      {isImageDataUrl(cardEditing?.backgroundImage) && <label className="visibility-choice"><input type="checkbox" name="removeUploadedBackgroundImage" /><span><strong>Remove uploaded background</strong><small>Leave unchecked to keep the current image.</small></span></label>}
       <label className="visibility-choice"><input type="checkbox" name="isPublic" defaultChecked={cardEditing ? cardEditing.isPublic : true} /><span><strong>Show on my public page</strong><small>Turn off to keep this just for you.</small></span></label>
       <Button variant="coral" type="submit" className="form-submit">{cardEditing ? 'Save changes' : 'Add card'} <ArrowRight size={16} /></Button>
     </form>
@@ -891,14 +972,33 @@ function App() {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget).entries());
     const type = String(data.type);
-    const value = String(data.value || '').trim();
-    const backgroundImage = String(data.backgroundImage || '').trim();
+    let value = String(data.value || '').trim();
+    let backgroundImage = String(data.backgroundImage || '').trim();
     const backgroundColor = String(data.backgroundColor || '');
     const textColor = String(data.textColor || '');
+    const valueFile = data.valueUpload;
+    const backgroundFile = data.backgroundImageUpload;
+    const hasValueFile = valueFile instanceof File && valueFile.size > 0;
+    const hasBackgroundFile = backgroundFile instanceof File && backgroundFile.size > 0;
+    const storedValueImage = String(data.uploadedValue || '');
+    const storedBackgroundImage = String(data.uploadedBackgroundImage || '');
+    try {
+      if (['photo', 'payment'].includes(type)) {
+        if (hasValueFile) value = await optimizeUploadedImage(valueFile);
+        else if (!value && data.removeUploadedValue !== 'on' && isImageDataUrl(storedValueImage)) value = storedValueImage;
+      }
+      if (hasBackgroundFile) backgroundImage = await optimizeUploadedImage(backgroundFile);
+      else if (!backgroundImage && data.removeUploadedBackgroundImage !== 'on' && isImageDataUrl(storedBackgroundImage)) backgroundImage = storedBackgroundImage;
+    } catch (error) {
+      console.error('Unable to prepare a card image.', error);
+      return showToast(error.message || 'Could not prepare the selected image.');
+    }
     if (type === 'phone' && !normalizePhone(value)) return showToast('Enter a valid Philippine mobile number.');
     if (type === 'email' && !isValidEmail(value)) return showToast('Enter a valid email address.');
-    if (type !== 'schedule' && !['phone', 'email'].includes(type) && !isSafeWebUrl(value)) return showToast('Use a complete http:// or https:// URL.');
-    if (backgroundImage && !isSafeWebUrl(backgroundImage)) return showToast('Use a valid http or https background image URL.');
+    if (type !== 'schedule' && !['phone', 'email'].includes(type) && !(type === 'photo' || type === 'payment' ? isSafeImageSource(value) : isSafeWebUrl(value))) {
+      return showToast(type === 'photo' || type === 'payment' ? 'Add a valid image URL or choose an image from your device.' : 'Use a complete http:// or https:// URL.');
+    }
+    if (backgroundImage && !isSafeImageSource(backgroundImage)) return showToast('Use a valid http or https URL or choose an image from your device.');
     const scheduleCount = Number(data.scheduleCount);
     const schedules = type === 'schedule'
       ? Array.from({ length: scheduleCount }, (_, index) => ({
@@ -928,8 +1028,8 @@ function App() {
     setCardDialog(true);
   }
   async function saveAppearance(appearance) {
-    if (appearance.cardBackgroundImage && !isSafeWebUrl(appearance.cardBackgroundImage)) {
-      showToast('Use a valid http or https background image URL.');
+    if (appearance.cardBackgroundImage && !isSafeImageSource(appearance.cardBackgroundImage)) {
+      showToast('Use a valid http or https URL or choose an image from your device.');
       return;
     }
     const cardCopy = ['cardFrontLabel', 'cardFrontFooter', 'cardBackLabel', 'cardBackFooter'];

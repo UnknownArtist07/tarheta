@@ -49,7 +49,7 @@ Open `/?u=demo` on a phone (or deploy the app to a reachable HTTPS URL). **Call*
 
 - Profile visits increment a simple database counter; it is not unique-visitor analytics.
 - Social metadata is updated client-side; most messaging crawlers need server-rendered or pre-rendered profile metadata to create per-profile previews.
-- The current card system stores URL values in the browser. It does not provide secure file uploads or media hosting.
+- Card images can use a URL or an image selected from the device. Uploaded images are resized and optimized before being saved with profile data; Tarheta does not provide managed media hosting.
 - Existing accounts and profiles saved in an earlier browser `localStorage` version are not automatically imported into Neon.
 - The verified account email used for password recovery is separate from the public contact email shown on the profile.
 
