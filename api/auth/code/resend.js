@@ -1,6 +1,6 @@
 import { getDb } from '../../../lib/server/db.js';
 import { issueEmailChallenge, normalizeEmail } from '../../../lib/server/email-challenges.js';
-import { handleError, readJson, requireSameOrigin, send } from '../../../lib/server/utils.js';
+import { enforceRateLimit, handleError, readJson, requireSameOrigin, send } from '../../../lib/server/utils.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -8,6 +8,7 @@ export default async function handler(req, res) {
     return send(res, 405, { error: 'Method not allowed.' });
   }
   try {
+    if (!await enforceRateLimit(req, res, { scope: 'code-resend', limit: 5, windowSeconds: 900 })) return;
     requireSameOrigin(req);
     const body = await readJson(req);
     const email = normalizeEmail(body.email);

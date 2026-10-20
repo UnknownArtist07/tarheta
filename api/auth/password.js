@@ -1,5 +1,5 @@
 import { getDb } from '../../lib/server/db.js';
-import { getSession, handleError, newPasswordCredentials, passwordMatches, readJson, requireSameOrigin, send } from '../../lib/server/utils.js';
+import { enforceRateLimit, getSession, handleError, newPasswordCredentials, passwordMatches, readJson, requireSameOrigin, send } from '../../lib/server/utils.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'PUT') {
@@ -7,7 +7,8 @@ export default async function handler(req, res) {
     return send(res, 405, { error: 'Method not allowed.' });
   }
   try {
-    requireSameOrigin(req);
+    if (!await enforceRateLimit(req, res, { scope: 'password-change', limit: 5, windowSeconds: 900 })) return;
+    requireSameOrigin(req, { allowBearerToken: true });
     const session = await getSession(req);
     if (!session) return send(res, 401, { error: 'Please sign in again.' });
     const body = await readJson(req);

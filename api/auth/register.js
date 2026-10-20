@@ -1,6 +1,6 @@
 import { getDb } from '../../lib/server/db.js';
 import { issueEmailChallenge, normalizeEmail } from '../../lib/server/email-challenges.js';
-import { handleError, newPasswordCredentials, readJson, requireSameOrigin, send, validateProfile } from '../../lib/server/utils.js';
+import { enforceRateLimit, handleError, newPasswordCredentials, readJson, requireSameOrigin, send, validateProfile } from '../../lib/server/utils.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -8,6 +8,7 @@ export default async function handler(req, res) {
     return send(res, 405, { error: 'Method not allowed.' });
   }
   try {
+    if (!await enforceRateLimit(req, res, { scope: 'register', limit: 5, windowSeconds: 3600 })) return;
     requireSameOrigin(req);
     const body = await readJson(req);
     const password = String(body.password || '');

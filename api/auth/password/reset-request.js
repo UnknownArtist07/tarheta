@@ -1,6 +1,6 @@
 import { getDb } from '../../../lib/server/db.js';
 import { issueEmailChallenge, normalizeEmail } from '../../../lib/server/email-challenges.js';
-import { handleError, readJson, requireSameOrigin, send } from '../../../lib/server/utils.js';
+import { enforceRateLimit, handleError, readJson, requireSameOrigin, send } from '../../../lib/server/utils.js';
 
 const GENERIC_MESSAGE = 'If an account uses that email address, a reset code will arrive shortly. It expires in 5 minutes.';
 
@@ -10,6 +10,7 @@ export default async function handler(req, res) {
     return send(res, 405, { error: 'Method not allowed.' });
   }
   try {
+    if (!await enforceRateLimit(req, res, { scope: 'password-reset-request', limit: 5, windowSeconds: 900 })) return;
     requireSameOrigin(req);
     const body = await readJson(req);
     const email = normalizeEmail(body.email);

@@ -1,5 +1,5 @@
 import { getDb } from '../../lib/server/db.js';
-import { handleError, isSafeWebUrl, profileFromRow, send } from '../../lib/server/utils.js';
+import { enforceRateLimit, handleError, isSafeWebUrl, profileFromRow, send } from '../../lib/server/utils.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -7,6 +7,7 @@ export default async function handler(req, res) {
     return send(res, 405, { error: 'Method not allowed.' });
   }
   try {
+    if (!await enforceRateLimit(req, res, { scope: 'public-profile', limit: 60, windowSeconds: 60 })) return;
     const username = String(req.query.username || '').trim().toLowerCase();
     if (!/^[a-z0-9._]{3,30}$/.test(username)) return send(res, 404, { error: 'Profile not found.' });
     const { sql, ready } = getDb();
