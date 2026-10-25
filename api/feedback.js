@@ -1,4 +1,4 @@
-import { randomInt, timingSafeEqual } from 'node:crypto';
+import { randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { getDb } from '../lib/server/db.js';
 import { enforceRateLimit, handleError, readJson, requireSameOrigin, send } from '../lib/server/utils.js';
 
@@ -59,9 +59,9 @@ export default async function handler(req, res) {
       const refCode = makeReference();
       await sql.query(
         `INSERT INTO tarheta_feedback
-          (ref_code, type, title, description, severity, email, screenshot_url, page_url, profile_username, user_agent, screen_size)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-        [refCode, type, title, description, severity, email || null, validateScreenshot(body.screenshot), cleanText(body.pageUrl, 2000), cleanText(body.profileUsername, 30), cleanText(body.userAgent, 500), cleanText(body.screenSize, 30)],
+          (id, ref_code, type, title, description, severity, email, screenshot_url, page_url, profile_username, user_agent, screen_size)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [randomUUID(), refCode, type, title, description, severity, email || null, validateScreenshot(body.screenshot), cleanText(body.pageUrl, 2000), cleanText(body.profileUsername, 30), cleanText(body.userAgent, 500), cleanText(body.screenSize, 30)],
       );
       return send(res, 201, { refCode });
     }
