@@ -37,6 +37,44 @@ To create Gmail API credentials:
 
 The database connection string must only be configured as a server-side environment variable; never add it to a `VITE_` variable or frontend code.
 
+## Website feedback and support
+
+Feedback is available from the landing page, public profiles, and the signed-in workspace at `/api/feedback` and is stored in the existing Neon Postgres database. The form accepts bug reports, problems, feature suggestions, and other notes. Reports are limited to five submissions per hour per client, and a hidden honeypot field provides basic bot protection.
+
+### Setup
+
+1. Add `FEEDBACK_ADMIN_PASSWORD` to `.env.local` for local development and to Vercel Production/Preview environment variables. Use a long, randomly generated password; it is never sent to the browser as configuration.
+2. Keep `DATABASE_URL` and (recommended) `RATE_LIMIT_SECRET` configured as described above. The feedback table is created automatically during the first API request after deployment.
+3. To create it manually instead, run this SQL in the Neon SQL editor:
+
+```sql
+CREATE TABLE IF NOT EXISTS tarheta_feedback (
+  id TEXT PRIMARY KEY,
+  ref_code TEXT NOT NULL UNIQUE,
+  type TEXT NOT NULL CHECK (type IN ('bug', 'problem', 'feature', 'other')),
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  severity TEXT CHECK (severity IN ('low', 'medium', 'high')),
+  email TEXT,
+  screenshot_url TEXT,
+  page_url TEXT,
+  profile_username TEXT,
+  user_agent TEXT,
+  screen_size TEXT,
+  status TEXT NOT NULL DEFAULT 'new'
+    CHECK (status IN ('new', 'in_progress', 'resolved', 'wont_fix')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS tarheta_feedback_created_idx
+  ON tarheta_feedback (created_at DESC);
+CREATE INDEX IF NOT EXISTS tarheta_feedback_status_idx
+  ON tarheta_feedback (status);
+```
+
+4. Deploy with `npx vercel --prod`. The admin inbox is available at `/admin/feedback`; enter the value of `FEEDBACK_ADMIN_PASSWORD` to view, filter, search, and update reports.
+
+Screenshots are resized in the browser and stored as validated data URLs in Neon because Tarheta already has a Neon backend and does not currently use Supabase Storage. `screenshot_url` is retained as the field name so the storage implementation can later be moved to object storage without changing the report shape. No Supabase bucket or service-role key is required for the current implementation.
+
 Run `npm run dev` to use Vercel's local function runtime alongside the Vite frontend. It requires the project to be linked and `DATABASE_URL` to be present in `.env.local`.
 
 ## Profile routes and demo

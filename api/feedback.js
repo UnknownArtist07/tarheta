@@ -43,6 +43,8 @@ export default async function handler(req, res) {
       if (!await enforceRateLimit(req, res, { scope: 'feedback', limit: 5, windowSeconds: 60 * 60 })) return;
       requireSameOrigin(req, { allowMissingOrigin: true });
       const body = await readJson(req);
+      if (String(body.title || '').trim().length > 100) throw Object.assign(new Error('Keep the title under 100 characters.'), { status: 400 });
+      if (String(body.description || '').trim().length > 1000) throw Object.assign(new Error('Keep the description under 1,000 characters.'), { status: 400 });
       const type = cleanText(body.type, 20);
       const title = cleanText(body.title, 100);
       const description = cleanText(body.description, 1000);

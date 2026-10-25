@@ -6,6 +6,7 @@ import {
   ShieldCheck, Sparkles, Trash2, Twitter, UserRound, X, Youtube,
 } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
+import { AdminFeedbackPage, FeedbackWidget } from './Feedback.jsx';
 
 const RESERVED = new Set(['admin', 'support', 'login', 'api', 'tarheta', 'help', 'about', 'settings']);
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -699,6 +700,10 @@ function App() {
   useEffect(() => {
     if (routerStarted.current) return;
     routerStarted.current = true;
+    if (window.location.pathname === '/admin/feedback') {
+      setPage('admin-feedback');
+      return;
+    }
     const routedUser = new URLSearchParams(window.location.search).get('u')
       || window.location.hash.match(/^#\/(.+)$/)?.[1];
     if (routedUser) {
@@ -1124,7 +1129,8 @@ function App() {
     );
   };
 
-  if (page === 'public' && profile) return <><PublicProfile /><Toast message={toast} /></>;
+  if (page === 'admin-feedback') return <AdminFeedbackPage />;
+  if (page === 'public' && profile) return <><PublicProfile /><FeedbackWidget profileUsername={profile.username} onToast={showToast} /><Toast message={toast} /></>;
   if (page === 'not-found') return <><div className="not-found-page"><Brand onClick={() => { changeAddress(); routeTo('landing'); }} /><span className="eyebrow">404 · LOST IN THE POST</span><h1>Hmm, nobody<br /><em>by that name.</em></h1><p>We couldn’t find that Tarheta page. Maybe a little typo?</p><Button variant="coral" onClick={profileInitial}>Make your own profile <ArrowRight size={16} /></Button></div><Toast message={toast} /></>;
 
   if (page === 'landing') return (
@@ -1145,7 +1151,7 @@ function App() {
         <section className="feature-section" id="features"><div className="section-title-row"><div><span className="eyebrow">A FEW THINGS IT DOES</span><h2>Small page.<br /><em>Big introduction.</em></h2></div><p>Everything useful, nothing noisy. Your page is yours to shape and easy for someone else to use.</p></div><div className="feature-grid"><article><span className="feature-number">01 / YOUR NAME, YOUR LINK</span><div className="feature-icon feature-icon-coral"><Link2 size={20} /></div><h3>One link to remember</h3><p>Your own corner of Tarheta. Easy to send, save, print, or scan.</p></article><article><span className="feature-number">02 / KEEP IT PERSONAL</span><div className="feature-icon feature-icon-green"><UserRound size={20} /></div><h3>A card that feels like you</h3><p>Share your contact details with a little more warmth than an email signature.</p></article><article><span className="feature-number">03 / YOUR OTHER WORLDS</span><div className="feature-icon feature-icon-gold"><Sparkles size={20} /></div><h3>Everything else, in reach</h3><p>Work, places, playlists, writing — make a neat little map of what matters to you.</p></article></div></section>
         <section className="closing-cta"><div><span className="eyebrow">YOUR INTRODUCTION IS WAITING</span><h2>Let’s make your<br /><em>next hello</em> a good one.</h2></div><Button variant="light" onClick={profileInitial}>Start your free page <ArrowRight size={16} /></Button><span className="closing-sun">✳</span></section>
         <footer className="site-footer"><Brand onClick={() => routeTo('landing')} /><span>MADE FOR GOOD CONNECTIONS</span><span>© TARHETA</span></footer>
-      </main><Toast message={toast} />
+      </main><FeedbackWidget onToast={showToast} /><Toast message={toast} />
     </>
   );
 
@@ -1325,6 +1331,7 @@ function App() {
         </main>
         <Modal title={cardEditing ? 'Tweak this card' : 'Add to your collection'} open={cardDialog} onClose={() => { setCardDialog(false); setCardEditing(null); }}><CardEditorForm key={`${cardDialog}-${cardEditing?.id || 'new'}`} cardEditing={cardEditing} onSubmit={submitCard} /></Modal>
         <ScheduleDialog card={scheduleDialog} onClose={() => setScheduleDialog(null)} />
+        <FeedbackWidget profileUsername={profile.username} onToast={showToast} />
         <Toast message={toast} />
       </>
     );
