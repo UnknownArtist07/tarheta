@@ -6,7 +6,9 @@ import {
   ShieldCheck, Sparkles, Trash2, Twitter, UserRound, X, Youtube,
 } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
+import { motion } from 'motion/react';
 import { AdminFeedbackPage, FeedbackWidget } from './Feedback.jsx';
+import { motionConfig } from './motion.js';
 
 const RESERVED = new Set(['admin', 'support', 'login', 'api', 'tarheta', 'help', 'about', 'settings']);
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -649,10 +651,18 @@ function App() {
   const [flipped, setFlipped] = useState(false);
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState('');
+  const [landingScrolled, setLandingScrolled] = useState(false);
   const toastTimer = useRef(null);
   const ownerCardsRef = useRef(null);
   const lastPointerType = useRef('mouse');
   const routerStarted = useRef(false);
+
+  useEffect(() => {
+    const updateScrollState = () => setLandingScrolled(window.scrollY > 18);
+    updateScrollState();
+    window.addEventListener('scroll', updateScrollState, { passive: true });
+    return () => window.removeEventListener('scroll', updateScrollState);
+  }, []);
 
   const showToast = useCallback((text) => {
     setToast(text);
@@ -1077,18 +1087,18 @@ function App() {
       }
     };
     return (
-      <main className="public-shell" style={appearanceStyle(profile)}>
+      <motion.main className="public-shell" style={appearanceStyle(profile)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: motionConfig.durations.entrance, ease: motionConfig.easeOut }}>
         <aside className="public-profile-panel">
           <div className="public-panel-top"><Brand onClick={() => { changeAddress(); routeTo('landing'); }} /><span className="availability"><span /> OPEN TO GOOD CONVERSATIONS</span></div>
-          <div className="profile-portrait-row"><ProfileAvatar profile={profile} className="avatar-large" /><span className="portrait-stamp">TARHETA<br />MEMBER</span></div>
-          <div className="public-name-block">
+          <motion.div className="profile-portrait-row" initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }} transition={{ ...motionConfig.springs.card, delay: 0.1 }}><ProfileAvatar profile={profile} className="avatar-large" /><span className="portrait-stamp">TARHETA<br />MEMBER</span></motion.div>
+          <motion.div className="public-name-block" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: motionConfig.durations.entrance, delay: 0.18, ease: motionConfig.easeOut }}>
             <span className="eyebrow">A LITTLE INTRODUCTION</span>
             <h1>{profile.name}<span className="name-period">.</span></h1>
             <p className="public-headline">{getHeadline(profile)}</p>
             <p className="profile-url"><Link2 size={14} /> tarheta.ph/{profile.username}</p>
-          </div>
-          <p className="public-bio">{profile.bio || 'A little more about me, and the best ways to get in touch.'}</p>
-          <div className="public-actions">
+          </motion.div>
+          <motion.p className="public-bio" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: motionConfig.durations.entrance, delay: 0.25, ease: motionConfig.easeOut }}>{profile.bio || 'A little more about me, and the best ways to get in touch.'}</motion.p>
+          <motion.div className="public-actions" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: motionConfig.durations.entrance, delay: 0.32, ease: motionConfig.easeOut }}>
             <div className="primary-actions">
               {phone && <a className="button button-coral button-prominent" href={`tel:${phone}`} onClick={desktopCall}><Phone size={17} /> Call me <ArrowUpRight size={15} /></a>}
               <button className="button button-light button-prominent" type="button" onClick={saveContact}><UserRound size={17} /> Save contact</button>
@@ -1099,14 +1109,14 @@ function App() {
               {(Array.isArray(profile.socialLinks) ? profile.socialLinks : []).map((social, index) => <a className="button button-outline" key={`${social.url}-${index}`} href={social.url} target="_blank" rel="noopener noreferrer"><Globe2 size={15} /> {social.label} <ArrowUpRight size={13} /></a>)}
               <button className="button button-outline" type="button" onClick={shareProfile}><Share2 size={16} /> Share</button>
             </div>
-          </div>
-          <QRPanel url={profileHref} onCopy={copyProfile} />
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: motionConfig.durations.entrance, delay: 0.4, ease: motionConfig.easeOut }}><QRPanel url={profileHref} onCopy={copyProfile} /></motion.div>
           <div className="panel-footer"><span>MADE TO BE SHARED</span><span>© TARHETA</span></div>
         </aside>
         <section className="public-content">
           <div className="content-topline"><button className="public-back-button" type="button" onClick={() => { changeAddress(); routeTo('landing'); }}>← Back to Tarheta</button><span>001 — {profile.username.toUpperCase()}</span></div>
           <div className="card-display-heading"><div><span className="eyebrow">A DIGITAL CALLING CARD</span><h2>Meet me, <em>properly.</em></h2></div><span className="flip-note"><span className="flip-glyph">↻</span> TAP TO TURN</span></div>
-          <ProfileCard profile={profile} flipped={flipped} flip={() => setFlipped((current) => !current)} />
+          <motion.div initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ ...motionConfig.springs.card, delay: 0.28 }}><ProfileCard profile={profile} flipped={flipped} flip={() => setFlipped((current) => !current)} /></motion.div>
           <div className="section-title-row"><div><span className="eyebrow">A FEW MORE THINGS</span><h2>Elsewhere, online.</h2></div><span className="count-pill">{profile.cards.filter((card) => card.isPublic).length.toString().padStart(2, '0')} LINKS</span></div>
           <div className="public-card-grid">
             {profile.cards.filter((card) => card.isPublic).map((card, index) => <ProfileTile key={card.id} card={card} onOpenSchedule={setScheduleDialog} style={{ '--tile-index': index }} />)}
@@ -1125,7 +1135,7 @@ function App() {
           <div className="dialog-actions"><Button variant="outline" onClick={() => copyText(profile.phone, 'Phone number copied.')}><Copy size={15} /> Copy number</Button><Button variant="coral" onClick={() => setContactDialog('')}>Done</Button></div>
         </Modal>
         <ScheduleDialog card={scheduleDialog} onClose={() => setScheduleDialog(null)} />
-      </main>
+      </motion.main>
     );
   };
 
@@ -1136,20 +1146,26 @@ function App() {
   if (page === 'landing') return (
     <>
       <main className="landing">
-        <header className="site-header"><Brand onClick={() => routeTo('landing')} /><nav className="header-links"><a href="#story">The idea</a><a href="#features">What you can share</a></nav><div className="header-actions"><button className="header-login" type="button" onClick={() => routeTo('login')}>Log in</button><Button variant="coral" onClick={profileInitial}>Create your page <ArrowRight size={15} /></Button></div></header>
+        <header className={`site-header ${landingScrolled ? 'site-header-scrolled' : ''}`}><Brand onClick={() => routeTo('landing')} /><nav className="header-links"><a href="#story">The idea</a><a href="#features">What you can share</a></nav><div className="header-actions"><button className="header-login" type="button" onClick={() => routeTo('login')}>Log in</button><Button variant="coral" onClick={profileInitial}>Create your page <ArrowRight size={15} /></Button></div></header>
         <section className="landing-hero">
-          <div className="hero-copy"><span className="eyebrow"><span className="eyebrow-mark" /> A MORE THOUGHTFUL WAY TO CONNECT</span><h1>Your whole<br />story, <em>one link.</em></h1><p>A little calling card for the internet. Your details, your work, your favorite corners — gathered in one lovely place.</p><div className="hero-buttons"><Button variant="coral" onClick={profileInitial}>Make your Tarheta <ArrowRight size={16} /></Button><button className="text-link" type="button" onClick={() => openPublic('demo', { addHistory: true })}>Take a little look <ArrowUpRight size={15} /></button></div><div className="social-proof"><div className="proof-avatars"><span>J</span><span>M</span><span>A</span></div><span>For the people you’re glad you met.</span></div></div>
+          <motion.div className="hero-copy" initial="hidden" animate="show" variants={{ hidden: {}, show: { transition: { staggerChildren: motionConfig.stagger.content } } }}>
+            <motion.span className="eyebrow" variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { duration: motionConfig.durations.entrance, ease: motionConfig.easeOut } } }}><span className="eyebrow-mark" /> A MORE THOUGHTFUL WAY TO CONNECT</motion.span>
+            <motion.h1 variants={{ hidden: { opacity: 0, y: 24 }, show: { opacity: 1, y: 0, transition: { duration: motionConfig.durations.entrance, ease: motionConfig.easeOut } } }}>Your whole<br />story, <em>one link.</em></motion.h1>
+            <motion.p variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: motionConfig.durations.entrance, ease: motionConfig.easeOut } } }}>A little calling card for the internet. Your details, your work, your favorite corners — gathered in one lovely place.</motion.p>
+            <motion.div className="hero-buttons" variants={{ hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0, transition: { duration: motionConfig.durations.entrance, ease: motionConfig.easeOut } } }}><Button variant="coral" onClick={profileInitial}>Make your Tarheta <ArrowRight size={16} /></Button><button className="text-link" type="button" onClick={() => openPublic('demo', { addHistory: true })}>Take a little look <ArrowUpRight size={15} /></button></motion.div>
+            <motion.div className="social-proof" variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: motionConfig.durations.entrance, ease: motionConfig.easeOut } } }}><div className="proof-avatars"><span>J</span><span>M</span><span>A</span></div><span>For the people you’re glad you met.</span></motion.div>
+          </motion.div>
           <div className="hero-art" aria-label="A layered collection of Tarheta profile cards">
             <div className="art-note">A GOOD INTRO<br />GOES A LONG WAY <span>✳</span></div>
-            <div className="art-card art-card-back"><span>01 / A THOUGHTFUL LINK</span><div className="art-circle" /><strong>Make room<br />for hello.</strong><small>tarheta.ph/you</small></div>
-            <div className="art-card art-card-mid"><span>YOUR ONLINE HOME</span><strong>Work<br />worth sharing.</strong><div className="art-pills"><i /> <i /> <i /></div></div>
-            <div className="art-card art-card-front"><div className="art-card-top"><span className="brand-mark">t</span><span>PERSONAL ID · 2025</span><span>✳</span></div><div className="art-avatar">JD</div><div><small>GOOD TO MEET YOU</small><strong>Juan Dela Cruz</strong><span>Designer · Manila</span></div><div className="art-card-bottom"><span>tarheta.ph/juandelacruz</span><ArrowUpRight size={17} /></div></div>
+            <motion.div className="art-card art-card-back" initial={{ opacity: 0, x: 34, rotate: -3 }} animate={{ opacity: 1, x: 0, rotate: -9 }} transition={{ ...motionConfig.springs.card, delay: 0.1 }}><span>01 / A THOUGHTFUL LINK</span><div className="art-circle" /><strong>Make room<br />for hello.</strong><small>tarheta.ph/you</small></motion.div>
+            <motion.div className="art-card art-card-mid" initial={{ opacity: 0, x: 38, rotate: 2 }} animate={{ opacity: 1, x: 0, rotate: 7 }} transition={{ ...motionConfig.springs.card, delay: 0.18 }}><span>YOUR ONLINE HOME</span><strong>Work<br />worth sharing.</strong><div className="art-pills"><i /> <i /> <i /></div></motion.div>
+            <motion.div className="art-card art-card-front" initial={{ opacity: 0, y: 28, rotate: 0 }} animate={{ opacity: 1, y: 0, rotate: -2 }} transition={{ ...motionConfig.springs.card, delay: 0.26 }}><div className="art-card-top"><span className="brand-mark">t</span><span>PERSONAL ID · 2025</span><span>✳</span></div><div className="art-avatar">JD</div><div><small>GOOD TO MEET YOU</small><strong>Juan Dela Cruz</strong><span>Designer · Manila</span></div><div className="art-card-bottom"><span>tarheta.ph/juandelacruz</span><ArrowUpRight size={17} /></div></motion.div>
             <div className="art-caption"><span>01</span><span>YOUR DIGITAL CALLING CARD</span><span>↗</span></div>
           </div>
         </section>
         <section className="manifesto" id="story"><span className="eyebrow">LESS SCROLLING. MORE CONNECTING.</span><p>Not another feed to keep up with.<br />Just a <em>good-looking little home</em> for all the ways to find you.</p><span className="manifesto-mark">✳</span></section>
-        <section className="feature-section" id="features"><div className="section-title-row"><div><span className="eyebrow">A FEW THINGS IT DOES</span><h2>Small page.<br /><em>Big introduction.</em></h2></div><p>Everything useful, nothing noisy. Your page is yours to shape and easy for someone else to use.</p></div><div className="feature-grid"><article><span className="feature-number">01 / YOUR NAME, YOUR LINK</span><div className="feature-icon feature-icon-coral"><Link2 size={20} /></div><h3>One link to remember</h3><p>Your own corner of Tarheta. Easy to send, save, print, or scan.</p></article><article><span className="feature-number">02 / KEEP IT PERSONAL</span><div className="feature-icon feature-icon-green"><UserRound size={20} /></div><h3>A card that feels like you</h3><p>Share your contact details with a little more warmth than an email signature.</p></article><article><span className="feature-number">03 / YOUR OTHER WORLDS</span><div className="feature-icon feature-icon-gold"><Sparkles size={20} /></div><h3>Everything else, in reach</h3><p>Work, places, playlists, writing — make a neat little map of what matters to you.</p></article></div></section>
-        <section className="closing-cta"><div><span className="eyebrow">YOUR INTRODUCTION IS WAITING</span><h2>Let’s make your<br /><em>next hello</em> a good one.</h2></div><Button variant="light" onClick={profileInitial}>Start your free page <ArrowRight size={16} /></Button><span className="closing-sun">✳</span></section>
+        <motion.section className="feature-section" id="features" initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.18 }} variants={{ hidden: {}, show: { transition: { staggerChildren: motionConfig.stagger.cards } } }}><div className="section-title-row"><div><span className="eyebrow">A FEW THINGS IT DOES</span><motion.h2 variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: motionConfig.durations.entrance, ease: motionConfig.easeOut } } }}>Small page.<br /><em>Big introduction.</em></motion.h2></div><p>Everything useful, nothing noisy. Your page is yours to shape and easy for someone else to use.</p></div><div className="feature-grid">{[[Link2, 'feature-icon-coral', '01 / YOUR NAME, YOUR LINK', 'One link to remember', 'Your own corner of Tarheta. Easy to send, save, print, or scan.'], [UserRound, 'feature-icon-green', '02 / KEEP IT PERSONAL', 'A card that feels like you', 'Share your contact details with a little more warmth than an email signature.'], [Sparkles, 'feature-icon-gold', '03 / YOUR OTHER WORLDS', 'Everything else, in reach', 'Work, places, playlists, writing — make a neat little map of what matters to you.']].map(([Icon, color, number, title, copy]) => <motion.article key={number} variants={{ hidden: { opacity: 0, y: 24 }, show: { opacity: 1, y: 0, transition: { duration: motionConfig.durations.entrance, ease: motionConfig.easeOut } } }}><span className="feature-number">{number}</span><div className={`feature-icon ${color}`}><Icon size={20} /></div><h3>{title}</h3><p>{copy}</p></motion.article>)}</div></motion.section>
+        <motion.section className="closing-cta" initial={{ opacity: 0, y: 24, scale: 0.985 }} whileInView={{ opacity: 1, y: 0, scale: 1 }} viewport={{ once: true, amount: 0.3 }} transition={{ duration: motionConfig.durations.entrance, ease: motionConfig.easeOut }}><div><span className="eyebrow">YOUR INTRODUCTION IS WAITING</span><h2>Let’s make your<br /><em>next hello</em> a good one.</h2></div><Button variant="light" onClick={profileInitial}>Start your free page <ArrowRight size={16} /></Button><span className="closing-sun">✳</span></motion.section>
         <footer className="site-footer"><Brand onClick={() => routeTo('landing')} /><span>MADE FOR GOOD CONNECTIONS</span><span>© TARHETA</span></footer>
       </main><FeedbackWidget onToast={showToast} /><Toast message={toast} />
     </>
@@ -1314,7 +1330,7 @@ function App() {
     const visibleCards = profile.cards || [];
     return (
       <>
-        <main className="owner-app" style={appearanceStyle(profile)}>
+        <motion.main className="owner-app" style={appearanceStyle(profile)} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: motionConfig.durations.entrance, ease: motionConfig.easeOut }}>
           <aside className="owner-sidebar"><Brand onClick={() => { changeAddress(); routeTo('landing'); }} /><div className="sidebar-profile"><ProfileAvatar profile={profile} /><div><strong>{profile.name}</strong><span>@{profile.username}</span></div></div><span className="sidebar-label">YOUR WORKSPACE</span>
             <nav className="owner-navigation" aria-label="Workspace"><button className={section === 'card' ? 'selected' : ''} onClick={() => setSection('card')}><UserRound size={17} /> My card <span>01</span></button><button className={section === 'cards' ? 'selected' : ''} onClick={() => setSection('cards')}><Link2 size={17} /> My links <span>{visibleCards.length.toString().padStart(2, '0')}</span></button><button className={section === 'tools' ? 'selected' : ''} onClick={() => setSection('tools')}><QrCode size={17} /> Share & stats</button><button className={section === 'appearance' ? 'selected' : ''} onClick={() => setSection('appearance')}><Palette size={17} /> Appearance</button><button className={section === 'profile' ? 'selected' : ''} onClick={() => setSection('profile')}><UserRound size={17} /> Profile</button></nav>
             <div className="sidebar-bottom"><button onClick={() => openPublic(profile.username, { addHistory: true })}><ExternalLink size={16} /> View public page</button><button onClick={leaveOwner}><ArrowLeft size={16} /> Log out</button></div>
@@ -1322,13 +1338,13 @@ function App() {
           <section className="owner-main"><header className="owner-topbar"><div><span className="eyebrow">YOUR TARHETA / {profile.username.toUpperCase()}</span><h1>{section === 'card' ? 'Your calling card' : section === 'cards' ? 'Your little collection' : section === 'appearance' ? 'Make it yours' : section === 'profile' ? 'Your profile' : 'Ready to share?'}</h1></div><div className="owner-top-actions"><button className="button button-outline" onClick={() => section === 'appearance' ? setSection('card') : copyProfile()}>{section === 'appearance' ? <><UserRound size={15} /> Preview my card</> : <><Copy size={15} /> Copy profile link</>}</button><button className="icon-button" onClick={() => setSection('profile')} aria-label="Edit profile"><Pencil size={17} /></button></div></header>
             <div className="mobile-owner-tabs"><button className={section === 'card' ? 'selected' : ''} onClick={() => setSection('card')}>Card</button><button className={section === 'cards' ? 'selected' : ''} onClick={() => setSection('cards')}>Links</button><button className={section === 'tools' ? 'selected' : ''} onClick={() => setSection('tools')}>Share</button><button className={section === 'appearance' ? 'selected' : ''} onClick={() => setSection('appearance')}>Theme</button></div>
             {section === 'card' && <div className="owner-card-section"><div className="owner-note"><span className="status-dot" /> YOUR PAGE IS LOOKING GOOD <span className="owner-views">{Number(profile.views) || 0} local views</span></div><div className="owner-card-center"><ProfileCard profile={profile} flipped={flipped} flip={() => setFlipped((value) => !value)} /><div className="owner-card-help"><span className="flip-icon">↻</span><span><strong>Give it a little tap</strong><small>This card flips over to show your contact details.</small></span><button className="icon-button" onClick={() => setSection('profile')} aria-label="Edit profile details"><Pencil size={16} /></button></div></div><div className="dashboard-bottom"><div><span className="eyebrow">YOUR PAGE ADDRESS</span><p className="share-address">{profileHref}</p></div><Button variant="coral" onClick={() => openPublic(profile.username, { addHistory: true })}>Visit public page <ArrowUpRight size={15} /></Button></div></div>}
-            {section === 'cards' &&                         <div className="owner-links-layout"><section className="card-manager"><div className="collection-heading"><div><span className="eyebrow">THE THINGS YOU SHARE</span><h2>Your collection</h2><p>Arrange your links, work, and favorite places.</p></div><Button variant="coral" onClick={() => beginCardEdit()}><Plus size={16} /> Add a card</Button></div><div className="owner-card-list" ref={ownerCardsRef}>{visibleCards.map((card, index) => <div className="draggable-row" key={card.id} draggable onDragOver={(event) => event.preventDefault()} onDragStart={(event) => onDragStart(event, card.id)} onDrop={(event) => onDrop(event, card.id)}><ProfileTile card={card} owner onEdit={beginCardEdit} onDelete={removeCard} onMove={moveCard} onKeyMove={moveCard} /><span className="row-order">{String(index + 1).padStart(2, '0')}</span></div>)}</div></section><aside className="live-preview"><div className="preview-label"><span className="status-dot" /> PUBLIC PREVIEW <ArrowUpRight size={15} /></div><div className="mini-profile"><ProfileAvatar profile={profile} /><div><strong>{profile.name}</strong><span>{getHeadline(profile)}</span></div></div><p>{profile.bio}</p><ProfileCard compact profile={profile} flip={() => setFlipped((value) => !value)} flipped={flipped} /><div className="preview-tile-list">{visibleCards.filter((card) => card.isPublic).map((card) => <ProfileTile key={card.id} card={card} onOpenSchedule={setScheduleDialog} />)}{visibleCards.some((card) => !card.isPublic) && <span className="hidden-cards-note"><ShieldCheck size={14} /> {visibleCards.filter((card) => !card.isPublic).length} private {visibleCards.filter((card) => !card.isPublic).length === 1 ? 'card' : 'cards'} hidden from your public page</span>}</div></aside></div>}
+            {section === 'cards' &&                         <div className="owner-links-layout"><section className="card-manager"><div className="collection-heading"><div><span className="eyebrow">THE THINGS YOU SHARE</span><h2>Your collection</h2><p>Arrange your links, work, and favorite places.</p></div><Button variant="coral" onClick={() => beginCardEdit()}><Plus size={16} /> Add a card</Button></div><div className="owner-card-list" ref={ownerCardsRef}>{visibleCards.map((card, index) => <motion.div layout transition={motionConfig.springs.gentle} className="draggable-row" key={card.id} draggable onDragOver={(event) => event.preventDefault()} onDragStart={(event) => onDragStart(event, card.id)} onDrop={(event) => onDrop(event, card.id)}><ProfileTile card={card} owner onEdit={beginCardEdit} onDelete={removeCard} onMove={moveCard} onKeyMove={moveCard} /><span className="row-order">{String(index + 1).padStart(2, '0')}</span></motion.div>)}</div></section><aside className="live-preview"><div className="preview-label"><span className="status-dot" /> PUBLIC PREVIEW <ArrowUpRight size={15} /></div><div className="mini-profile"><ProfileAvatar profile={profile} /><div><strong>{profile.name}</strong><span>{getHeadline(profile)}</span></div></div><p>{profile.bio}</p><ProfileCard compact profile={profile} flip={() => setFlipped((value) => !value)} flipped={flipped} /><div className="preview-tile-list">{visibleCards.filter((card) => card.isPublic).map((card) => <ProfileTile key={card.id} card={card} onOpenSchedule={setScheduleDialog} />)}{visibleCards.some((card) => !card.isPublic) && <span className="hidden-cards-note"><ShieldCheck size={14} /> {visibleCards.filter((card) => !card.isPublic).length} private {visibleCards.filter((card) => !card.isPublic).length === 1 ? 'card' : 'cards'} hidden from your public page</span>}</div></aside></div>}
             {section === 'tools' && <div className="tools-layout"><div className="tools-copy"><span className="eyebrow">GOOD THINGS TRAVEL</span><h2>Send your page<br /><em>into the world.</em></h2><p>Copy the link into a message or let someone scan your QR code. Either way, you’re easy to find.</p><Button variant="coral" onClick={copyProfile}><Copy size={15} /> Copy my link</Button><div className="local-metric"><span>{Number(profile.views) || 0}</span><div><strong>profile opens</strong><small>A local demo counter, just for this browser.</small></div></div></div><div className="tools-qr-card"><span className="eyebrow">A LITTLE DOOR BACK TO YOU</span><QRCodeCanvas value={profileHref} size={210} bgColor="#f4f0e6" fgColor="#171a1f" level="M" includeMargin /><strong>Scan to open my Tarheta</strong><span>tarheta.ph/{profile.username}</span><button className="text-link" onClick={(event) => { const canvas = event.currentTarget.parentElement.querySelector('canvas'); const a = document.createElement('a'); a.href = canvas.toDataURL(); a.download = `${profile.username}-qr.png`; a.click(); }}><Download size={15} /> Download QR code</button></div></div>}
             {section === 'appearance' && <AppearancePanel profile={profile} onSave={saveAppearance} />}
             {section === 'profile' && <ProfileSettings profile={profile} onProfileSave={(event) => submitProfile(event, 'edit')} onSocialSave={submitSocialLinks} onPhotoChange={changeProfilePhoto} onRemovePhoto={removeProfilePhoto} onPasswordChange={changePassword} />}
           </section>
           <nav className="owner-mobile-nav"><button className={section === 'card' ? 'selected' : ''} onClick={() => setSection('card')}><UserRound size={18} />Card</button><button className={section === 'cards' ? 'selected' : ''} onClick={() => setSection('cards')}><Link2 size={18} />Links</button><button className={section === 'tools' ? 'selected' : ''} onClick={() => setSection('tools')}><QrCode size={18} />Share</button><button className={section === 'appearance' ? 'selected' : ''} onClick={() => setSection('appearance')}><Palette size={18} />Theme</button><button className={section === 'profile' ? 'selected' : ''} onClick={() => setSection('profile')}><UserRound size={18} />Profile</button></nav>
-        </main>
+        </motion.main>
         <Modal title={cardEditing ? 'Tweak this card' : 'Add to your collection'} open={cardDialog} onClose={() => { setCardDialog(false); setCardEditing(null); }}><CardEditorForm key={`${cardDialog}-${cardEditing?.id || 'new'}`} cardEditing={cardEditing} onSubmit={submitCard} /></Modal>
         <ScheduleDialog card={scheduleDialog} onClose={() => setScheduleDialog(null)} />
         <FeedbackWidget profileUsername={profile.username} onToast={showToast} />
